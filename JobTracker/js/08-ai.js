@@ -173,6 +173,27 @@ function mockCard(){const L=db.mocks.slice().sort((x,y)=>y.at.localeCompare(x.at
 /* ---------- 粘贴面试邀请 → 建日程 ---------- */
 let INV=null;
 const looksInvite=t=>/面试|笔试|测评|宣讲|offer|邀请|视频面|[一二三四终复初]面|技术面|hr ?面|主管面|面一下|腾讯会议|飞书会议|会议号|zoom/i.test(t)&&/(\d{1,2}\s*[:：点]|\d{1,2}\s*月\s*\d{1,2}|\d{1,2}[/-]\d{1,2}|明天|后天|今天|下周|周[一二三四五六日天]|星期)/.test(t)&&t.length<4000;
+function classifyNotice(text,td){const t=String(text||'');const base=/^\d{4}-\d\d-\d\d$/.test(td||'')?td:today();let kind='unknown';
+ if(/录用通知|拟录用|录用决定|offer|入职手续|恭喜.*(录用|通过.*面试)/i.test(t))kind='offer';
+ else if(/很遗憾|未能通过|未通过本轮|没有通过|不(太)?匹配|未能进入|祝.*求职顺利/.test(t))kind='rejected';
+ else if(/笔试|测评|在线测试|编程测试/.test(t))kind='test';
+ else if(/面试|视频面|邀请您参加|复试|终面/.test(t))kind='interview';
+ let at='';const dm=(re,fn)=>{const m=t.match(re);if(m)at=fn(m);};
+ dm(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2})[:：](\d{2}))?/,m=>m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0')+'T'+String(m[4]||'10').padStart(2,'0')+':'+(m[5]||'00'));
+ if(!at)dm(/(\d{1,2})月(\d{1,2})日\s*(上午|下午|晚上)?\s*(\d{1,2})?[:：点]?(\d{2})?/,m=>{let h=m[4]?+m[4]:10;if((m[3]==='下午'||m[3]==='晚上')&&h<12)h+=12;if(m[3]==='上午'&&h===12)h=0;return base.slice(0,4)+'-'+String(m[1]).padStart(2,'0')+'-'+String(m[2]).padStart(2,'0')+'T'+String(h).padStart(2,'0')+':'+(m[5]||'00');});
+ if(!at&&(kind==='interview'||kind==='test')){const rel=/后天/.test(t)?2:/明天/.test(t)?1:/今天|今晚/.test(t)?0:-1;if(rel>=0){const tm=t.match(/(上午|下午|晚上)?\s*(\d{1,2})[:：点](\d{2})?/);let h=tm?+tm[2]:10;if(tm&&(tm[1]==='下午'||tm[1]==='晚上')&&h<12)h+=12;at=dstr(new Date(new Date(base+'T00:00:00').getTime()+rel*864e5))+'T'+String(h).padStart(2,'0')+':'+(tm&&tm[3]?tm[3]:'00');}}
+ return{kind,at};}
+ function noticeApp(text){return db.apps.find(a=>a.company&&text.includes(a.company))||null;}
+ let NOTICE=null;
+function openNotice(text=''){closeModal();aiModal('📥 粘贴通知入账','<p class="t2" style="margin:0 0 8px">把笔试 / 面试 / 录用 / 拒信的邮件或短信整段粘进来。先在本地认类型和时间（不联网），认出公司就自动建日程或更新状态；拿不准的再交给 AI。</p><textarea class="inp" id="ntT" rows="7" placeholder="粘贴通知全文…">'+esc(text)+'</textarea><div class="mfoot"><button class="btn" data-act="mclose">取消</button><button class="btn primary" data-act="noticego">识别入账</button></div>');}
+function noticeGo(){const t=(document.getElementById('ntT')?.value||'').trim();if(!t)return toast('先粘贴通知内容');const a=noticeApp(t);const c=classifyNotice(t);
+ if(!a){if(c.kind==='interview'||c.kind==='test')return openInvite(t);return toast('没认出是哪家公司：先把这家公司加到履迹里，再粘贴一次');}
+ if((c.kind==='interview'||c.kind==='test')){if(!c.at)return openInvite(t,a.id);const title=c.kind==='test'?'笔试 / 测评':'面试';if(a.events.some(e=>e.type===(c.kind==='test'?'test':'interview')&&e.at===c.at))return toast('这条日程已经建过了');
+ a.events.push({id:uid(),type:c.kind==='test'?'test':'interview',title,at:c.at,place:'',done:false});if(c.kind==='interview'&&a.status==='applied')setStatus(a,'interview');touch(a);save();closeModal();openDrawer(a.id);return toast('已给 '+a.company+' 建好'+title+'日程：'+c.at.replace('T',' '),['🎯 备战',()=>openPrep(a.id)]);}
+ if(c.kind==='rejected'){setStatus(a,'rejected');touch(a);save();closeModal();openDrawer(a.id);return toast(a.company+' 已标记为未通过，去记一下卡在哪一步吧');}
+ if(c.kind==='offer'){setStatus(a,'offer');touch(a);save();closeModal();openDrawer(a.id);return toast('🎉 '+a.company+' 已标记为 Offer，去填 Offer 细节吧');}
+ openInvite(t,a.id);}
+
 function openInvite(text='',aid=''){closeModal();INV={aid,text,res:null};aiModal('📋 粘贴面试邀请',`<p class="t2" style="margin:0 0 8px">把 HR 发来的消息（微信、短信、邮件都行）整段粘进来，AI 会认出公司、时间、轮次和会议链接，帮你建好日程。</p><textarea class="inp" id="invT" rows="7" placeholder="如：您好，邀请您参加我司 Java 开发工程师岗位的二面，时间 11 月 28 日（周五）下午 2:30，腾讯会议 123-456-789……">${esc(text)}</textarea><div class="mfoot"><button class="btn" data-act="mclose">取消</button><button class="btn primary" data-act="invgo">识别</button></div>`);
  setTimeout(()=>document.getElementById('invT')?.focus(),30);}
 function invMatch(c){c=String(c||'').trim().toLowerCase();if(!c)return null;return db.apps.filter(a=>!['rejected','dropped'].includes(a.status)).find(a=>{const x=a.company.trim().toLowerCase();return x&&(x===c||x.includes(c)||c.includes(x));})||null;}
@@ -211,6 +232,21 @@ async function openJdAdvice(aid,force){const a=appById(aid);if(!a)return;closeMo
  catch(e){if(aiLive(tk))document.getElementById('aiBody').innerHTML=aiErr(e,'jdadvice2');}}
 function jdShow(a){const x=a.aiResume;document.getElementById('aiBody').innerHTML=`<div class="t2" style="margin-bottom:6px">对照简历「${esc(x.title)}」· ${esc(x.at.replace('T',' '))} · 由 ${AI_NAME[x.engine]||'AI'} 生成</div><div class="aiout">${md(x.text)}</div>
  <div class="mfoot"><button class="btn" data-act="jdadvice2" style="margin-right:auto">重新生成</button><button class="btn" data-act="aicopy">📋 复制</button><button class="btn primary" data-view="resume">去改简历</button></div>`;INV={copy:x.text,aid:a.id};}
+
+/* ---------- 每岗定制简历：AI 定制要点 + 存为这家专属版 ---------- */
+async function tailorGo(aid){const a=appById(aid);if(!a)return;const r=resumeCtx(a);if(!r)return toast('如页里还没有简历，先去「我的简历」写一份');
+const F=kwFind(a.notes||'');if(!F.length)return toast('先在备注里粘贴这个岗位的 JD');const g=tailorGaps(F,r.text);closeDrawer();
+const tk=aiModal(`🎯 ${esc(a.company)} · 定制简历要点`,'');document.getElementById('aiBody').innerHTML=aiLoading('正在按这家 JD 挑要突出和要补的内容…');
+try{const t=await ai({system:'你是资深简历顾问。只基于简历里真实存在的经历给定制建议，绝不编造经历、数据或不会的技能；缺的关键词只能建议他学了之后再加。用中文 Markdown，简洁可执行。',
+prompt:`目标公司：${a.company}\n目标岗位：${a.role}\n\n${(a.notes||'').slice(0,3000)}\n\n\n${r.text}\n\n关键词覆盖：已覆盖 ${g.hit.join('、')||'无'}；还没覆盖 ${g.miss.join('、')||'无'}（覆盖率 ${g.score}%）。\n请输出：\n## 这家最看重的 3 点\n## 简历里要往前提、要加重的经历（具体到条目）\n## 没覆盖的关键词怎么办（逐个：简历里其实有但没写出来 / 确实没有，别硬凑）\n## 给这家的一句话自我介绍`,max:2200,temperature:.4});
+a.tailor={at:nowLocal(),text:t};touch(a);save();if(aiLive(tk)){document.getElementById('aiBody').innerHTML=`<div class="t2" style="margin-bottom:6px">关键词覆盖率 ${g.score}% · 已存到这条投递的抽屉里</div><div class="aiout">${md(t)}</div><div class="mfoot"><button class="btn" data-act="aicopy">📋 复制</button><button class="btn primary" data-act="tailorbind" data-a="${a.id}">📎 存为这家专属版并绑定</button></div>`;INV={copy:t,aid:a.id};}}
+catch(e){if(aiLive(tk))document.getElementById('aiBody').innerHTML=aiErr(e,'tailorgo2');}}
+function tailorBind(aid){const a=appById(aid);if(!a)return;const cur=resumeFor(a);if(!cur)return toast('先在抽屉里选一份「投递用的简历」');
+const title=tailorTitle(a);if(ruyeTitle(cur)===title)return toast('现在绑定的已经是这家专属版');
+try{const all=JSON.parse(localStorage.getItem('ruye:documents')||'[]');const ex=all.find(d=>ruyeTitle(d)===title);
+if(!ex){const copy=JSON.parse(JSON.stringify(cur));copy.id=uid();if(copy.doc){copy.doc.meta=copy.doc.meta||{};copy.doc.meta.title=title;}all.push(copy);localStorage.setItem('ruye:documents',JSON.stringify(all));}
+a.resume=title;touch(a);save();closeModal();openDrawer(a.id);toast('已绑定「'+title+'」，去如页里按定制要点改这一版');}
+catch(e){toast('存专属版失败：读不到如页的简历数据');}}
 
 /* ---------- 题目参考答案 ---------- */
 async function aiAnswer(h,btn){const x=allQuestions().find(q=>q.h===h);if(!x)return;const inFC=!!FC;if(btn){btn.setAttribute('disabled','');btn.textContent='生成中…';}

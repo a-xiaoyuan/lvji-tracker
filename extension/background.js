@@ -52,6 +52,7 @@ chrome.runtime.onMessage.addListener((m, sender, reply) => {
       return { ok: true };
     }
     if (m.type === 'miss') { await diag({ ...m, url: m.url || sender.tab?.url }); return { ok: true }; }
+    if (m.type === 'profile') { try { const d = await call('/jobtracker'); return { ok: true, profile: (d && d.settings && d.settings.profile) || {} }; } catch (e) { return { ok: false, why: e.message === '未配对' ? '还没和履迹连上' : '履迹没在运行' }; } }
     if (m.type === 'record') {
       const opts = await get(['autoApply', 'autoInvite']);
       if (m.item.kind === 'job' && opts.autoApply === false && !m.manual) return { ok: false, why: 'off' };
