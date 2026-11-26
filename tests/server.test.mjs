@@ -90,11 +90,7 @@ test('收件箱：同源或带密钥才能放东西；取走后能删除', async
   assert.equal((Array.isArray(after) ? after : after.items).length, 0);
 });
 
-test('Agent 额度默认关闭，打开后才读取', async () => {
-  assert.deepEqual(await (await fetch(BASE + '/api/agent', { headers: H })).json(), { off: true });
-  const on = await (await fetch(BASE + '/api/agent/enable', { method: 'POST', headers: H, body: JSON.stringify({ on: true }) })).json();
-  assert.equal(on.on, true);
-  const off = await (await fetch(BASE + '/api/agent/enable', { method: 'POST', headers: H, body: JSON.stringify({ on: false }) })).json();
-  assert.equal(off.on, false);
-  assert.ok(!fs.existsSync(path.join(STATE, 'agent-on.txt')));
+test('Agent 额度接口已下线（不再读取其他 AI 工具的记录）', async () => {
+  const r = await fetch(BASE + '/api/agent', { headers: H });
+  assert.equal(r.status, 404);
 });

@@ -84,11 +84,8 @@ document.addEventListener('click',e=>{
   if(act==='ghosted'){const a=appById(actEl.dataset.a);if(a){a.fail={stage:'简历筛选',reasons:['没回音'],note:'',at:today()};setStatus(a,'rejected',true);render();toast(`已把 ${a.company} 移到「未通过」，别灰心，下一个更好`);}return;}
   if(act==='history')return openHistory();
   if(act==='restore')return restoreBackup(actEl.dataset.i);
-  if(act==='agsnooze'){const S=agSnoozed();S[actEl.dataset.k]=Date.now()+7*864e5;localStorage.setItem('jt_agsnooze',JSON.stringify(S));AG.sig=null;return render();}
   if(act==='agjump'){document.getElementById('ag-'+actEl.dataset.k)?.scrollIntoView({behavior:'smooth',block:'start'});return;}
   if(act==='extdiagcopy')return copyText('履迹助手诊断信息\n'+EXT_DIAG.map(d=>`${new Date(d.at).toISOString()} | ${d.site} | ${d.stage} | ${d.why} | ${d.url}`).join('\n'),'已复制诊断信息');
-  if(act==='agenton'||act==='agentoff')return agentToggle(act==='agenton');
-  if(act==='agentrefresh'){AG.at=0;loadAgent(true);return toast('正在刷新…');}
   if(act==='addtpl')return editTpl();
   if(act==='resettpl'){db.tpls=DEF_TPL.map(t=>({...t}));persist();return render();}
   if(act==='copymiss')return copyText(actEl.dataset.k,'已复制，去简历里补上会的那些');

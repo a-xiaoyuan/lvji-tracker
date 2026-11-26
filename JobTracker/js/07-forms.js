@@ -164,7 +164,7 @@ function cmdResults(){const k=(document.getElementById('cq')?.value||'').trim().
    ['🍅','开始专注 25 分钟','专注 番茄 计时 focus',()=>document.querySelector('[data-focus="25"]')?.click()],['✎','写今天的日记','日记 记录 今天',()=>{jDate=today();view='journal';render();}],
    ['🎤','练习自我介绍','自我介绍 练习 计时',()=>openIntro('1')],['📊','导出投递为 Excel','导出 表格 excel csv',()=>{download(`履迹-投递记录-${today()}.csv`,toCSV(),'text/csv;charset=utf-8');toast('已导出');}],
    ['💾','立即备份','备份 保存',()=>{persist();push().then(()=>toast(sync.state==='ok'?'已备份':'备份失败'));}],['🕰','历史备份 / 恢复数据','历史 恢复 备份 还原',()=>openHistory()],
-   ['🌓','切换深色 / 浅色主题','主题 深色 浅色 夜间 theme',()=>document.getElementById('themeBtn')?.click()],['🤖','查看 AI 额度','额度 claude codex agent 用量',()=>{view='agent';render();}]]
+   ['🌓','切换深色 / 浅色主题','主题 深色 浅色 夜间 theme',()=>document.getElementById('themeBtn')?.click()]]
    .filter(([,n,kw])=>has(n+' '+kw)).slice(0,5).forEach(([ic,n,,run])=>R.push({ic,t:n,s:'操作',run}));
   VIEWS.filter(([,n])=>has(n)).forEach(([v,n])=>R.push({ic:'↪',t:n,s:'页面',run:()=>{view=v;render();}}));
   db.people.filter(x=>has(x.name+' '+x.company+' '+x.notes)).slice(0,4).forEach(x=>R.push({ic:'🤝',t:x.name,s:'人脉 · '+(x.company||''),run:()=>editPerson(x)}));

@@ -9,8 +9,6 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { agentUsage } from './agent-usage.mjs';
-import { othersUsage } from './agents-more.mjs';
 import { runAI, aiStatus, setDeepseekKey } from './ai.mjs';
 import { lcSync } from './leetcode.mjs';
 
@@ -29,10 +27,6 @@ const INBOX_FILE = path.join(DATA_DIR, 'inbox.json');
 const RUYE_FILE = path.join(DATA_DIR, 'ruye-resumes.json');
 const RUYE_BAK = path.join(BACKUP_DIR, '简历');
 const SELF = `http://127.0.0.1:${PORT}`;
-const AGENT_FILE = path.join(STATE, 'agent-usage.json');
-// 「Agent 额度」是可选功能：会读取本机其他 AI 编程工具的用量记录。默认关闭，在履迹设置里打开后才会读。
-const AGENT_ON_FILE = path.join(STATE, 'agent-on.txt');
-const agentOn = () => fs.existsSync(AGENT_ON_FILE);
 const SNAP_DIR = path.join(BACKUP_DIR, '恢复前');
 const EXT_DIR = path.resolve(HERE, '..', 'extension'); // 浏览器扩展「履迹助手」
 let extSeen = 0, extVer = '', extDiag = [];
@@ -277,19 +271,6 @@ async function api(req, res) {
       return send(res, 200, { ok: true, folder: DATA_DIR, savedAt: body.savedAt });
     } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
   }
-  // Agent 额度（可选功能，默认关闭）：开关
-  if (req.url === '/api/agent/enable' && req.method === 'POST') {
-    try {
-      const { on } = JSON.parse(await readBody(req, 1024) || '{}');
-      if (on) await fsp.writeFile(AGENT_ON_FILE, new Date().toISOString()); else await fsp.unlink(AGENT_ON_FILE).catch(() => {});
-      return send(res, 200, { ok: true, on: agentOn() });
-    } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
-  }
-  // Claude Code 等 AI 编程工具的用量（读本机对话记录 + 状态栏写下的官方额度），只有打开了开关才读
-  if (req.url === '/api/agent' && req.method === 'GET' && !agentOn()) return send(res, 200, { off: true });
-  if (req.url === '/api/agent' && req.method === 'GET') {
-    try { const [cc, others] = await Promise.all([agentUsage(AGENT_FILE), othersUsage()]); return send(res, 200, { ...cc, others }); } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
-  }
   // 如页简历（存在浏览器 localStorage 里）也备份一份到文件
   if (req.url === '/api/ruye' && req.method === 'GET') {
     try { const t = await fsp.readFile(RUYE_FILE, 'utf8'); res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); return res.end(t); }
@@ -349,4 +330,3 @@ const server = http.createServer((req, res) => {
 });
 server.on('error', (e) => { if (e.code === 'EADDRINUSE') process.exit(0); throw e; });
 server.listen(PORT, '127.0.0.1');
-if (agentOn()) setTimeout(() => agentUsage(AGENT_FILE).catch(() => {}), 3000); // 预先扫描一遍，打开页面时更快
