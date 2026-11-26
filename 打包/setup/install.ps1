@@ -47,7 +47,7 @@ if ($old) {
 # 3. 复制程序文件（访问密钥 token.txt、DeepSeek 密钥不在安装包里，原有的会保留）
 New-Item -ItemType Directory -Force $Dst | Out-Null
 foreach ($d in 'JobTracker', 'Ruye', 'helper', 'extension') {
-  $rc = robocopy (Join-Path $Src $d) (Join-Path $Dst $d) /MIR /XF token.txt deepseek-key.txt agent-usage.json digest-sent.txt /XD node_modules /NFL /NDL /NJH /NJS /NP
+  $rc = robocopy (Join-Path $Src $d) (Join-Path $Dst $d) /MIR /XF token.txt deepseek-key.txt agent-usage.json digest-sent.txt agent-on.txt /XD node_modules /NFL /NDL /NJH /NJS /NP
   if ($LASTEXITCODE -ge 8) { Fail "复制 $d 失败（robocopy 返回 $LASTEXITCODE）" }
 }
 Copy-Item (Join-Path $Src 'VERSION') $Dst -Force

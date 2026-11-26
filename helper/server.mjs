@@ -14,20 +14,25 @@ import { othersUsage } from './agents-more.mjs';
 import { runAI, aiStatus, setDeepseekKey } from './ai.mjs';
 import { lcSync } from './leetcode.mjs';
 
-const PORT = 47321;
+// LVJI_PORT / LVJI_DATA_DIR / LVJI_STATE_DIR 只给自动测试用：让测试跑在临时目录里，碰不到真实数据
+const PORT = +process.env.LVJI_PORT || 47321;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const STATE = process.env.LVJI_STATE_DIR || HERE; // 密钥、开关这类本机状态文件放哪
 const RUYE = path.resolve(HERE, '..', 'Ruye');
 const JOBS = path.resolve(HERE, '..', 'JobTracker');
-const DATA_DIR = path.join(os.homedir(), 'Documents', '求职进度');
+const DATA_DIR = process.env.LVJI_DATA_DIR || path.join(os.homedir(), 'Documents', '求职进度');
 const DATA_FILE = path.join(DATA_DIR, 'jobtracker-data.json');
 const BACKUP_DIR = path.join(DATA_DIR, '每日备份');
-const TOKEN_FILE = path.join(HERE, 'token.txt');
+const TOKEN_FILE = path.join(STATE, 'token.txt');
 const KEEP_BACKUPS = 30;
 const INBOX_FILE = path.join(DATA_DIR, 'inbox.json');
 const RUYE_FILE = path.join(DATA_DIR, 'ruye-resumes.json');
 const RUYE_BAK = path.join(BACKUP_DIR, '简历');
 const SELF = `http://127.0.0.1:${PORT}`;
-const AGENT_FILE = path.join(HERE, 'agent-usage.json');
+const AGENT_FILE = path.join(STATE, 'agent-usage.json');
+// 「Agent 额度」是可选功能：会读取本机其他 AI 编程工具的用量记录。默认关闭，在履迹设置里打开后才会读。
+const AGENT_ON_FILE = path.join(STATE, 'agent-on.txt');
+const agentOn = () => fs.existsSync(AGENT_ON_FILE);
 const SNAP_DIR = path.join(BACKUP_DIR, '恢复前');
 const EXT_DIR = path.resolve(HERE, '..', 'extension'); // 浏览器扩展「履迹助手」
 let extSeen = 0, extVer = '';
@@ -37,6 +42,7 @@ let lastSeen = 0; // 履迹页面最后一次带密钥访问的时间，用来�
 const EVN = { interview: '面试', test: '笔试/测评', followup: '跟进', offer: 'Offer 沟通', note: '备注' };
 const sentRem = new Set();
 function winToast(title, body, url = '') {
+  if (process.env.LVJI_NO_NOTIFY) return;
   try {
     const ch = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', path.join(HERE, 'toast.ps1')],
       { env: { ...process.env, LVJI_TITLE: title, LVJI_BODY: body, LVJI_URL: url }, windowsHide: true, stdio: 'ignore' });
@@ -69,7 +75,7 @@ async function checkReminders() {
 setInterval(checkReminders, 60e3);
 
 /* ---------- 每天早上的今日汇总（Windows 通知） ---------- */
-const DIGEST_FILE = path.join(HERE, 'digest-sent.txt');
+const DIGEST_FILE = path.join(STATE, 'digest-sent.txt');
 const p2 = n => String(n).padStart(2, '0');
 const ymd = t => `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())}`;
 const qHash = s => { let h = 0; for (const c of s) h = (h * 31 + c.codePointAt(0)) | 0; return 'q' + (h >>> 0).toString(36); }; // 和页面里的 hashStr 一致
@@ -147,6 +153,12 @@ async function readBody(req, limit = 20 * 1024 * 1024) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+// 数据文件当前的版本号（savedAt）。第一次从文件读，之后每次保存时更新，不用每次都读整个文件。
+let curSavedAt = null, saveQ = Promise.resolve();
+async function fileSavedAt() {
+  if (curSavedAt === null) { try { curSavedAt = JSON.parse(await fsp.readFile(DATA_FILE, 'utf8')).savedAt || 0; } catch { curSavedAt = curSavedAt ?? 0; } }
+  return curSavedAt;
+}
 async function saveData(payload) {
   await fsp.mkdir(BACKUP_DIR, { recursive: true });
   const text = JSON.stringify(payload, null, 1);
@@ -242,12 +254,30 @@ async function api(req, res) {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body || typeof body.savedAt !== 'number' || !body.data || !Array.isArray(body.data.apps)) return send(res, 400, { error: 'bad payload' });
-      body.folder = DATA_DIR;
-      await saveData(body);
-      return send(res, 200, { ok: true, folder: DATA_DIR });
+      // 防覆盖：页面会带上「我上次看到的文件版本」(base)。文件在这之后被别的窗口改过，就拒绝并把新版本发回去，由页面合并后再存。
+      // 没带 base 的旧版页面照旧直接保存。检查和登记在同一个同步步骤里完成，两个请求同时到也不会都通过。
+      await fileSavedAt(); const cur = curSavedAt; // 读完后不再 await，直到登记新版本
+      if (typeof body.base === 'number' && cur > body.base && cur !== body.savedAt) {
+        await saveQ.catch(() => {}); // 等正在写的保存完成，再把最新文件发回去
+        let text = '{}'; try { text = await fsp.readFile(DATA_FILE, 'utf8'); } catch {}
+        res.writeHead(409, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); return res.end(text);
+      }
+      delete body.base; body.folder = DATA_DIR;
+      curSavedAt = body.savedAt;
+      await (saveQ = saveQ.then(() => saveData(body), () => saveData(body)));
+      return send(res, 200, { ok: true, folder: DATA_DIR, savedAt: body.savedAt });
     } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
   }
-  // Claude Code 用量（读本机对话记录 + 状态栏写下的官方额度）
+  // Agent 额度（可选功能，默认关闭）：开关
+  if (req.url === '/api/agent/enable' && req.method === 'POST') {
+    try {
+      const { on } = JSON.parse(await readBody(req, 1024) || '{}');
+      if (on) await fsp.writeFile(AGENT_ON_FILE, new Date().toISOString()); else await fsp.unlink(AGENT_ON_FILE).catch(() => {});
+      return send(res, 200, { ok: true, on: agentOn() });
+    } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
+  }
+  // Claude Code 等 AI 编程工具的用量（读本机对话记录 + 状态栏写下的官方额度），只有打开了开关才读
+  if (req.url === '/api/agent' && req.method === 'GET' && !agentOn()) return send(res, 200, { off: true });
   if (req.url === '/api/agent' && req.method === 'GET') {
     try { const [cc, others] = await Promise.all([agentUsage(AGENT_FILE), othersUsage()]); return send(res, 200, { ...cc, others }); } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
   }
@@ -272,7 +302,7 @@ async function api(req, res) {
     } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
   }
   if (req.url === '/api/migrated' && req.method === 'PUT') {
-    await fsp.writeFile(path.join(HERE, 'migrated.txt'), new Date().toISOString());
+    await fsp.writeFile(path.join(STATE, 'migrated.txt'), new Date().toISOString());
     return send(res, 200, { ok: true });
   }
   return send(res, 404, { error: 'not found' });
@@ -309,4 +339,4 @@ const server = http.createServer((req, res) => {
 });
 server.on('error', (e) => { if (e.code === 'EADDRINUSE') process.exit(0); throw e; });
 server.listen(PORT, '127.0.0.1');
-setTimeout(() => agentUsage(AGENT_FILE).catch(() => {}), 3000); // 预先扫描一遍，打开页面时更快
+if (agentOn()) setTimeout(() => agentUsage(AGENT_FILE).catch(() => {}), 3000); // 预先扫描一遍，打开页面时更快

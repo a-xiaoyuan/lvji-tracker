@@ -631,6 +631,29 @@ function normalize(d){d=d&&typeof d==='object'?d:{};d.apps=Array.isArray(d.apps)
  d.journal=Array.isArray(d.journal)?d.journal:[];d.habits=Array.isArray(d.habits)?d.habits:DEF_HABITS.map(h=>({...h}));d.skills=Array.isArray(d.skills)?d.skills:[];d.stories=Array.isArray(d.stories)?d.stories:[];d.people=Array.isArray(d.people)?d.people:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.reviews=d.reviews||{};d.milestones=Array.isArray(d.milestones)?d.milestones:[];d.qsrs=d.qsrs||{};d.mocks=Array.isArray(d.mocks)?d.mocks:[];d.chat=Array.isArray(d.chat)?d.chat:[];d.qnote=d.qnote||{};d.tpls=Array.isArray(d.tpls)?d.tpls:DEF_TPL.map(t=>({...t}));
  if(!d.settings.v1SamplesCleaned){const n=d.apps.length;d.apps=d.apps.filter(a=>!(a.sample||/（示例）$/.test(a.company)||/^示例公司 [A-Z]$/.test(a.company)));d.settings.v1SamplesCleaned=true;if(d.apps.length!==n){d.qmark={};d._cleaned=true;}}
  return d;}
+/* 两个履迹窗口同时改了数据时合并（theirs = 文件里别的窗口存的，mine = 本窗口的）：
+   - 带 id 的列表（投递、人脉、故事……）按 id 合并，两边都有的取 updatedAt 新的，一样新就取本窗口的；
+   - 同一条收件箱记录（inboxId 相同）只保留一份，避免两个窗口各收一次；
+   - 对象（设置、题目掌握情况……）按键合并，本窗口的优先；没有 id 的列表用本窗口的。
+   删除不会同步：一边删掉、另一边还在的条目会被保留，宁可多一条也不丢。 */
+function mergeDb(theirs,mine){
+ theirs=theirs&&typeof theirs==='object'?theirs:{};mine=mine&&typeof mine==='object'?mine:{};
+ const out={...theirs};
+ for(const k of new Set([...Object.keys(theirs),...Object.keys(mine)])){
+  const t=theirs[k],m=mine[k];
+  if(m===undefined){out[k]=t;continue;}if(t===undefined){out[k]=m;continue;}
+  if(Array.isArray(t)&&Array.isArray(m)){
+   const byId=x=>x&&typeof x==='object'&&x.id!=null;
+   if(!(t.every(byId)&&m.every(byId))){out[k]=m;continue;}
+   const map=new Map(t.map(x=>[x.id,x]));
+   for(const x of m){const y=map.get(x.id);map.set(x.id,!y||(x.updatedAt||0)>=(y.updatedAt||0)?x:y);}
+   let L=[...map.values()];
+   if(k==='apps'){const seen=new Map();L=L.filter(a=>{if(!a.inboxId)return true;const o=seen.get(a.inboxId);if(!o){seen.set(a.inboxId,a);return true;}return false;});}
+   out[k]=L;
+  }else if(t&&m&&typeof t==='object'&&typeof m==='object'&&!Array.isArray(t)&&!Array.isArray(m))out[k]={...t,...m};
+  else out[k]=m;
+ }
+ return out;}
 /* ========== 打击感控件：把页面里的按钮、勾选框、开关、滑块、进度条换成 sakuga-vfx ========== */
 const SKFX=window.SakugaFX||null;
 function skTint(){if(!SKFX)return;const cs=getComputedStyle(document.documentElement),v=n=>cs.getPropertyValue(n).trim(),dark=document.documentElement.dataset.theme==='dark';
@@ -692,18 +715,26 @@ let TOKEN=localStorage.getItem('jt_token')||'';
 let START_VIEW='';
 (()=>{const h=location.hash,m=h.match(/k=([0-9a-f]{16,})/),v=h.match(/v=(\w+)/);if(m){TOKEN=m[1];localStorage.setItem('jt_token',TOKEN);}if(v)START_VIEW=v[1];if(h)history.replaceState(null,'',location.pathname);})();
 const sync={state:TOKEN?'wait':'off',folder:'',at:0};
+// SYNC_BASE：本窗口最后一次和文件对上时，文件的版本号。保存时带上它，文件在这之后被别的窗口改过，服务会拒绝（409）。
+let SYNC_BASE=0;
 async function pull(){
  if(!TOKEN){sync.state='off';return renderSync();}
  try{const r=await fetch(API,{headers:{'x-token':TOKEN},cache:'no-store'});if(!r.ok)throw r.status;const j=await r.json();sync.folder=j.folder||sync.folder;
-  if(j.data&&Array.isArray(j.data.apps)&&(j.savedAt||0)>(db.savedAt||0)){db=normalize(j.data);db.savedAt=j.savedAt;if(db._cleaned){delete db._cleaned;persist();}localStorage.setItem(KEY,JSON.stringify(db));applyTheme();render();if(openId)renderDrawer();toast('已从备份文件载入最新数据');}
-  else if((db.savedAt||0)>(j.savedAt||0)||(!j.data&&db.apps.length))await push();
+  if(j.data&&Array.isArray(j.data.apps)&&(j.savedAt||0)>(db.savedAt||0)){db=normalize(j.data);db.savedAt=j.savedAt;SYNC_BASE=j.savedAt||0;if(db._cleaned){delete db._cleaned;persist();}localStorage.setItem(KEY,JSON.stringify(db));applyTheme();render();if(openId)renderDrawer();toast('已从备份文件载入最新数据');}
+  else if((db.savedAt||0)>(j.savedAt||0)||(!j.data&&db.apps.length)){if(!SYNC_BASE)SYNC_BASE=j.savedAt||0;await push();}
+  else SYNC_BASE=j.savedAt||0;
   sync.state='ok';sync.at=Date.now();}catch{sync.state='err';}
  renderSync();
 }
 let pushT;function schedulePush(){if(!TOKEN)return;clearTimeout(pushT);pushT=setTimeout(push,600);}
-async function push(){
+async function push(retry){
  if(!TOKEN)return;clearTimeout(pushT);
- try{const r=await fetch(API,{method:'PUT',headers:{'content-type':'application/json','x-token':TOKEN},body:JSON.stringify({savedAt:db.savedAt||Date.now(),data:db})});if(!r.ok)throw 0;const j=await r.json();sync.state='ok';sync.folder=j.folder||sync.folder;sync.at=Date.now();}
+ try{const sa=db.savedAt||Date.now();const r=await fetch(API,{method:'PUT',headers:{'content-type':'application/json','x-token':TOKEN},body:JSON.stringify({savedAt:sa,base:SYNC_BASE,data:db})});
+  if(r.status===409&&!retry){ // 另一个窗口刚存过：合并两边，再存一次
+   const j=await r.json();db=normalize(mergeDb(j.data,db));db.savedAt=Math.max(Date.now(),(j.savedAt||0)+1);SYNC_BASE=j.savedAt||0;
+   localStorage.setItem(KEY,JSON.stringify(db));applyTheme();render();if(openId)renderDrawer();
+   toast('另一个履迹窗口也改了数据，已经自动合并两边的修改');return push(true);}
+  if(!r.ok)throw 0;const j=await r.json();SYNC_BASE=sa;sync.state='ok';sync.folder=j.folder||sync.folder;sync.at=Date.now();}
  catch{sync.state='err';}renderSync();
 }
 function renderSync(){
@@ -711,7 +742,7 @@ function renderSync(){
  el.innerHTML=`<span class="s" style="background:${c}"></span><span>${t}</span>`;
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&saveT)flushSave();});
-addEventListener('pagehide',()=>{if(saveT)flushSave();if(pushT&&TOKEN){const body=JSON.stringify({savedAt:db.savedAt,data:db});if(body.length<60000)fetch(API,{method:'PUT',keepalive:true,headers:{'content-type':'application/json','x-token':TOKEN},body});}});
+addEventListener('pagehide',()=>{if(saveT)flushSave();if(pushT&&TOKEN){const body=JSON.stringify({savedAt:db.savedAt,base:SYNC_BASE,data:db});if(body.length<60000)fetch(API,{method:'PUT',keepalive:true,headers:{'content-type':'application/json','x-token':TOKEN},body});}});
 
 /* ========== 如页简历备份 ==========
    如页把简历存在 localStorage（ruye:documents），这里定时把它同步到 文档\求职进度\ruye-resumes.json；
@@ -776,7 +807,7 @@ function render(){try{renderInner();}catch(err){console.error(err);const v=docum
 function renderInner(){
  const upcoming=allEvents().filter(({e})=>!e.done&&e.at&&e.at.slice(0,10)>=today()).length;
  const cnt={agent:agentAlerts(AG.d,Date.now()).length,people:db.people.filter(p=>p.nextAt&&p.nextAt<=today()).length,list:db.apps.length,cal:upcoming,offer:db.apps.filter(a=>a.status==='offer').length,bank:allQuestions().filter(x=>db.qmark[x.h]!=='ok').length};
- document.getElementById('nav').innerHTML=VIEWS.map(([k,n])=>({dash:'<div class="navg">求职</div>',resume:'<div class="navg">我自己</div>',agent:'<div class="navg">工具</div>',settings:'<div class="navg"></div>'}[k]||'')+`<button data-view="${k}" title="${n}" class="${view===k?'on':''}">${svg(k)}${n}${cnt[k]?`<span class="cnt">${cnt[k]}</span>`:''}</button>`).join('');
+ document.getElementById('nav').innerHTML=VIEWS.filter(([k])=>k!=='agent'||agShow()||view==='agent').map(([k,n])=>({dash:'<div class="navg">求职</div>',resume:'<div class="navg">我自己</div>',agent:'<div class="navg">工具</div>',settings:'<div class="navg"></div>'}[k]||'')+`<button data-view="${k}" title="${n}" class="${view===k?'on':''}">${svg(k)}${n}${cnt[k]?`<span class="cnt">${cnt[k]}</span>`:''}</button>`).join('');
  const [t,s]={dash:['概览',greet()],board:['看板','拖动卡片即可更新进度'],list:['全部投递',`共 ${db.apps.length} 条记录`],cal:['面试日程','所有笔试、面试与跟进安排'],offer:['Offer 对比','按年包、成长和生活平衡综合比较'],bank:['面试题库','面试里被问到的题，点一下就能去练'],tpl:['话术模板','打招呼、内推、跟进、感谢信，一键填好公司和岗位后复制'],resume:['我的简历',''],review:['回顾与历程','看看这段时间的自己：数据、心情、复盘和里程碑'],journal:['成长日记','每天一分钟，记下努力的自己'],skills:['能力树','会什么、差什么、先补什么'],stories:['面试故事库','用 STAR 法则准备行为面试，被问到时不慌'],people:['人脉','帮过你、能帮你的人，到时间提醒你联系'],agent:['Agent 额度','各个 AI 编程助手的额度和用量，数据只在本机读取'],settings:['设置与备份','数据安全、提醒和偏好']}[view];
  document.getElementById('title').textContent=t;document.getElementById('subtitle').textContent=s;
  document.getElementById('topAdd').hidden=!['dash','board','list','cal'].includes(view);if(view==='settings'){setTimeout(aiStatusFill,50);setTimeout(extStatusFill,60);} // 只在求职相关页面显示添加按钮
@@ -1011,6 +1042,8 @@ function vSettings(){
  <div class="card set" id="extCard"><h3>🔗 投递自动记录（Boss直聘 · 牛客网）</h3><p>装上浏览器扩展「履迹助手」后：在 Boss直聘 网页上点「立即沟通」、在牛客网职位页「立即申请」并确认后，都会自动记到履迹（已投递）；牛客上跳去公司官网网申的，先记成「待投递」提醒你填完。Boss 的 HR 在聊天里约面试时，会自动交给 AI 识别并提醒你建日程。它只读你正在看的页面，不会替你点任何按钮，也不碰你的账号。手机 App 上的操作记不到。</p>
  <ol class="t2" style="margin:4px 0 10px;padding-left:20px;line-height:2"><li>点下面「打开扩展文件夹」</li><li>在 Edge 地址栏输入 <code>edge://extensions</code> 回车（Chrome 是 <code>chrome://extensions</code>），打开左边或右上角的「开发人员模式」</li><li>点「加载解压缩的扩展」，选刚才打开的那个文件夹</li><li>关掉履迹再从桌面打开一次，扩展就自动连上了</li></ol>
  <div class="row" style="flex-wrap:wrap;gap:8px"><button class="btn" data-act="extopen">📂 打开扩展文件夹</button><button class="btn ghost" data-act="extcopy">复制 edge://extensions</button><span class="t2" id="extStat">${TOKEN?'检查中…':''}</span></div></div>
+ ${TOKEN?`<div class="card set"><h3>🤖 Agent 额度（可选）</h3><p>给同时在用 AI 编程工具的人：打开后，履迹会读取本机 Claude Code、Codex、Kimi、Qoder、Gemini 等工具的用量记录，在「Agent 额度」页显示还剩多少额度。这些记录只在你电脑上读取，不会上传。和求职无关，默认关闭。</p>
+ <div class="row" style="gap:8px">${agShow()?'<span class="tag" style="color:var(--ok)">✓ 已打开</span><button class="btn" data-act="agentoff">关闭</button>':'<button class="btn" data-act="agenton">打开 Agent 额度</button>'}</div></div>`:''}
  <div class="card set"><h3>🧩 力扣同步</h3><p>填上力扣（leetcode.cn）用户名，概览页会显示刷题数、提交热力图、每日一题和最近通过的题，打开履迹时和之后每 30 分钟自动同步。只读取公开主页，不需要登录，也不要密码。用户名就是个人主页网址 leetcode.cn/u/<b>这一段</b>/，直接粘贴主页网址也行。</p><div class="row" style="flex-wrap:wrap;gap:8px"><input class="inp" id="lcU" value="${esc(db.settings.lcUser||'')}" placeholder="如：zhang-san" style="width:220px"><button class="btn primary" data-act="lcsave">${db.settings.lcUser?'保存并同步':'连接'}</button>${db.settings.lcUser?'<button class="btn ghost" data-act="lcoff">断开</button>':''}<span class="t2" id="lcStat">${db.lcErr?'😵 '+esc(db.lcErr):db.lc?`✓ 已连上 ${esc(db.lc.name)}，累计 ${db.lc.solved.all} 题，${ago(db.lc.at,Date.now())}同步`:''}</span></div></div>
  <div class="card set"><h3>🤖 AI 助手</h3><p>模拟面试、识别面试邀请、按 JD 改简历、参考答案、写话术、复盘总结和公司速查都会用到。用的时候会把这次需要的内容（JD、简历、题目、复盘等）发给对应的服务，不用就不会发。首选的不可用（没余额、没登录）时会自动换下一个；公司速查要联网搜索，只能用 Claude Code 或 Codex。</p><div class="row"><span>首选</span><select class="inp" data-set="aiEngine" style="width:auto">${[['deepseek','DeepSeek（最快、最便宜）'],['claude','Claude Code'],['codex','Codex（较慢）']].map(([k,n])=>`<option value="${k}" ${(db.settings.aiEngine||'deepseek')===k?'selected':''}>${n}</option>`).join('')}</select><button class="btn sm" data-act="aitest">测试一下</button></div><div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px"><span>DeepSeek 密钥</span><input class="inp" type="password" id="dsKey" placeholder="sk-…（在 platform.deepseek.com 申请）" autocomplete="off" style="width:280px"><button class="btn sm" data-act="dskey">保存</button><span class="t2" id="dsKeyStat"></span></div><div class="row" id="aiStat" style="margin-top:8px;flex-wrap:wrap;gap:6px"><span class="t2">${TOKEN?'正在检查…':'要从桌面快捷方式打开履迹才能用 AI'}</span></div></div>
  <div class="card set"><h3>🙋 关于我</h3><p>名字、目标岗位、意向城市、期望薪资、求职开始日期和给自己的一句话，会显示在概览顶部。</p><div class="row"><button class="btn" data-act="editme">编辑</button></div></div>
@@ -1096,7 +1129,9 @@ async function loadAgent(force){if(!TOKEN||AG.busy)return;if(!force&&Date.now()-
  try{const r=await fetch('http://127.0.0.1:47321/api/agent',{headers:{'x-token':TOKEN},cache:'no-store'});if(!r.ok)throw new Error(r.status===404?'本机助手版本旧了，重新打开履迹试试':'HTTP '+r.status);AG.d=await r.json();AG.err='';}
  catch(e){AG.err=String(e.message||e);}AG.at=Date.now();AG.busy=false;agentAfterLoad();}
 function agSnoozed(){try{return JSON.parse(localStorage.getItem('jt_agsnooze')||'{}');}catch{return {};}}
-function agentAlerts(D,now){if(!D)return [];const L=[],S=agSnoozed(),X=D.others||{};
+const agShow=()=>!!(AG.d&&!AG.d.off); // Agent 额度是可选功能，没打开时不显示这一页，也不提醒
+async function agentToggle(on){try{const r=await fetch('http://127.0.0.1:47321/api/agent/enable',{method:'POST',headers:{'content-type':'application/json','x-token':TOKEN},body:JSON.stringify({on})});if(!r.ok)throw 0;AG.d=null;AG.at=0;await loadAgent(true);toast(on?'已打开 Agent 额度，左边菜单「工具」下面能看到':'已关闭 Agent 额度，不再读取其他 AI 工具的记录');render();}catch{toast('没切换成功：本机助手没连上');}}
+function agentAlerts(D,now){if(!D||D.off)return [];const L=[],S=agSnoozed(),X=D.others||{};
  const add=(k,tool,msg,lv)=>{if(!(S[k]>now))L.push({k,tool,msg,lv});};
  const q=(k,tool,name,pct,reset,win)=>{if(!(reset>now)||!(pct>=0))return;const p=pace(pct,reset,win,now),r=Math.round(pct);
   if(pct>=80||(p&&p.out&&pct>=40))add(`${k}-${Math.round(reset/6e4)}`,tool,`${tool} ${name}额度已用 ${r}%${p&&p.out?`，按目前速度约 ${fmtLeft(p.out)}后用完`:''}，${fmtLeft(reset-now)}后重置`,pct>=95||(p&&p.out)?'bad':'warn');};
@@ -1186,6 +1221,7 @@ function agTrae(t){if(!t)return '';
 function vAgent(){
  if(!TOKEN)return `<div class="card empty">需要从桌面的「履迹」快捷方式打开，才能读取本机的 Claude Code 用量。</div>`;
  loadAgent();const D=AG.d,now=Date.now();
+ if(D&&D.off)return `<div class="card empty">Agent 额度没有打开。到「设置与备份」里打开后，这里会显示本机 AI 编程工具的用量。</div>`;
  if(!D)return `<div class="card empty">${AG.err?'读取失败：'+esc(AG.err):'正在读取本机的 Claude Code 记录…（第一次需要几秒）'}</div>`;
  const O=D.official,age=O?now-O.at:0;
  const b=D.block,bmax=Math.max(1,...D.blocks.map(x=>x.o));
@@ -2109,6 +2145,7 @@ document.addEventListener('click',e=>{
   if(act==='restore')return restoreBackup(actEl.dataset.i);
   if(act==='agsnooze'){const S=agSnoozed();S[actEl.dataset.k]=Date.now()+7*864e5;localStorage.setItem('jt_agsnooze',JSON.stringify(S));AG.sig=null;return render();}
   if(act==='agjump'){document.getElementById('ag-'+actEl.dataset.k)?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if(act==='agenton'||act==='agentoff')return agentToggle(act==='agenton');
   if(act==='agentrefresh'){AG.at=0;loadAgent(true);return toast('正在刷新…');}
   if(act==='addtpl')return editTpl();
   if(act==='resettpl'){db.tpls=DEF_TPL.map(t=>({...t}));persist();return render();}

@@ -19,7 +19,7 @@ if (Test-Path $Root) { Remove-Item $Root -Recurse -Force }
 New-Item -ItemType Directory -Force "$Stage\app", "$Stage\setup" | Out-Null
 
 # 1. 程序文件
-$skip = @('token.txt', 'deepseek-key.txt', 'agent-usage.json', 'migrated.txt', 'digest-sent.txt', 'launch.vbs', '*.log', '*.bak', '*.tmp')
+$skip = @('token.txt', 'deepseek-key.txt', 'agent-usage.json', 'migrated.txt', 'digest-sent.txt', 'agent-on.txt', 'launch.vbs', '*.log', '*.bak', '*.tmp')
 foreach ($d in 'JobTracker', 'Ruye', 'helper', 'extension') {
   $null = robocopy (Join-Path $Apps $d) "$Stage\app\$d" /MIR /XF $skip /XD node_modules .git /NFL /NDL /NJH /NJS /NP
   if ($LASTEXITCODE -ge 8) { Fail "复制 $d 失败" }

@@ -1,0 +1,11 @@
+{
+  "name": "lvji-tracker",
+  "private": true,
+  "description": "履迹：本地优先的求职进度管理",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test"
+  }
+}
