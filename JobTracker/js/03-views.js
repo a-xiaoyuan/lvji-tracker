@@ -82,6 +82,7 @@ function stTag(k){const s=SM[k]||SM.applied;return `<span class="tag" style="bac
 function whenBox(at){const d=new Date(at),ds=dstr(d),dd=dayDiff(ds,today());return `<div class="when ${dd===0?'today':''}"><span>${dd===0?'今天':dd===1?'明天':(d.getMonth()+1)+'月'}</span><b>${dd<=1&&dd>=0?pad(d.getHours())+':'+pad(d.getMinutes()):d.getDate()}</b></div>`;}
 function weekStart(){const m=new Date();m.setHours(0,0,0,0);m.setDate(m.getDate()-((m.getDay()+6)%7));return m;}
 
+function resumeStats(apps){const M=new Map();for(const a of apps||[]){if(!a||a.status==='wish')continue;const k=(a.resume||'').trim()||'（没记简历）';if(!M.has(k))M.set(k,{name:k,n:0,r:0});const o=M.get(k);o.n++;if(!['applied','wish'].includes(a.status)||(a.events||[]).some(e=>e.type!=='note'&&e.type!=='followup'))o.r++;}return [...M.values()].map(o=>({...o,rate:o.n?Math.round(o.r/o.n*100):0})).sort((x,y)=>y.n-x.n||y.rate-x.rate);}
 function vDash(){
  const A=db.apps,sent=A.filter(a=>a.status!=='wish');
  const responded=sent.filter(a=>!['applied','wish'].includes(a.status)||a.events.some(e=>e.type!=='note'&&e.type!=='followup'));
@@ -103,6 +104,7 @@ function vDash(){
  const wmax=Math.max(1,...weeks.map(w=>w.n));
  const fun=[['投递',sent.length,'#5f5a63'],['有回应',responded.length,'#959ba6'],['进入面试',interviewed.length,'#5f5a63'],['拿到 Offer',offers.length,'#4b4852']];
  const chs=CH.map(c=>{const L=sent.filter(a=>a.channel===c);return{c,n:L.length,r:L.filter(a=>responded.includes(a)).length};}).filter(x=>x.n).sort((a,b)=>b.n-a.n);
+ const rvs=resumeStats(A),rmax=Math.max(1,...rvs.map(x=>x.n));
  const cmax=Math.max(1,...chs.map(x=>x.n));
  const hasSample=A.some(a=>a.sample);
  return `${meCard()}${A.length?todayCard():vEmpty()}${lcCard()}
@@ -138,6 +140,9 @@ function vDash(){
  </div>
  <div class="card sec" style="margin-top:16px"><h3>渠道效果<span class="m">投递数 · 回复率 · 一般几天回</span></h3>
   ${chs.length?chs.map(x=>`<div class="chl w"><span>${x.c}</span><div class="bar"><i style="width:${x.n/cmax*100}%"></i></div><span class="r">${x.n} 个 · ${Math.round(x.r/x.n*100)}%${RS[x.c]?` · 约 ${RS[x.c].med} 天`:''}</span></div>`).join(''):'<div class="empty">还没有已投递的记录</div>'}
+ </div>
+ <div class="card sec" style="margin-top:16px"><h3>简历版本效果<span class="m">投递数 · 回复率，哪版简历更受欢迎</span></h3>
+  ${rvs.length?rvs.map(x=>`<div class="chl w"><span>${esc(x.name)}</span><div class="bar"><i style="width:${x.n/rmax*100}%"></i></div><span class="r">${x.n} 个 · 回复率 ${x.rate}%</span></div>`).join(''):'<div class="empty">投递时在抽屉里记下用的哪版简历，这里就能比出哪版回复率高</div>'}
  </div>`;
 }
 function dueTag(a){if(!a.due||a.status!=='wish')return '';const d=dayDiff(a.due,today());return `<span class="tag" style="${d<=3?'background:#ff2d8718;color:var(--bad);font-weight:600':''}">⏳ ${d<0?'已截止':d===0?'今天截止':a.due.slice(5).replace('-','/')+' 截止'}</span>`;}
