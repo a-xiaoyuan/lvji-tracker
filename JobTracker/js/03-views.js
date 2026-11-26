@@ -82,6 +82,16 @@ function stTag(k){const s=SM[k]||SM.applied;return `<span class="tag" style="bac
 function whenBox(at){const d=new Date(at),ds=dstr(d),dd=dayDiff(ds,today());return `<div class="when ${dd===0?'today':''}"><span>${dd===0?'今天':dd===1?'明天':(d.getMonth()+1)+'月'}</span><b>${dd<=1&&dd>=0?pad(d.getHours())+':'+pad(d.getMinutes()):d.getDate()}</b></div>`;}
 function weekStart(){const m=new Date();m.setHours(0,0,0,0);m.setDate(m.getDate()-((m.getDay()+6)%7));return m;}
 
+function todayQueueCard(){
+ const td=today(),tm=dstr(new Date(Date.now()+864e5)),RS=replyStats();
+ const reviewN=allQuestions().filter(x=>!x.dup&&db.qmark[x.h]!=='ok'&&(!db.qsrs[x.h]||db.qsrs[x.h].due<=td)).length;
+ const Q=buildTodayQueue(db.apps,td,tm,RS,reviewN),show=Q.slice(0,10);
+ const row=x=>{
+  if(x.kind==='due')return `<div class="alert">⏳ <b>${esc(x.company)}</b> · ${esc(x.role)} ${x.what==='offer'?'Offer '+(x.days===0?'今天':x.days+' 天后')+'截止答复':(x.days<0?'投递已过期 '+(-x.days)+' 天':x.days===0?'今天截止投递':x.days+' 天后截止投递')}<span style="flex:1"></span><button class="btn sm" data-act="qopen" data-a="${x.app}">打开详情</button></div>`;
+  if(x.kind==='prep')return `<div class="alert">🎤 <b>${esc(x.company)}</b> · ${esc(x.title||'面试')} 明天 ${esc(x.at.slice(11,16))}<span style="flex:1"></span><button class="btn sm" data-act="prep" data-a="${x.app}" data-e="${x.event}">🎯 打开面试准备</button></div>`;
+  if(x.kind==='stale')return `<div class="alert">📨 <b>${esc(x.company)}</b> · ${esc(x.role)} 投递 ${x.days} 天没动静${x.med?`<span class="t2">（${esc(x.channel)}通常 ${x.med} 天内有回音）</span>`:''}<span style="flex:1"></span><button class="btn sm" data-act="qfollow" data-a="${x.app}">标记已跟进</button><button class="btn sm ghost" data-act="qopen" data-a="${x.app}">打开详情</button></div>`;
+  return `<div class="alert">🎴 今天有 <b>${x.n}</b> 道面试题该复习<span style="flex:1"></span><button class="btn sm" data-act="review">开始复习</button></div>`;};
+ return `<div class="card sec" style="margin-bottom:16px"><h3>⚡ 今日行动队列<span class="m">按紧急程度排</span></h3>${show.length?show.map(row).join(''):'<div class="empty">今天没有要紧的事，按自己的节奏来 🎉</div>'}${Q.length>show.length?`<div class="t2" style="margin-top:6px">还有 ${Q.length-show.length} 条排在后面，先处理上面这些。</div>`:''}</div>`;}
 function vDash(){
  const A=db.apps,sent=A.filter(a=>a.status!=='wish');
  const responded=sent.filter(a=>!['applied','wish'].includes(a.status)||a.events.some(e=>e.type!=='note'&&e.type!=='followup'));
@@ -105,7 +115,7 @@ function vDash(){
  const chs=CH.map(c=>{const L=sent.filter(a=>a.channel===c);return{c,n:L.length,r:L.filter(a=>responded.includes(a)).length};}).filter(x=>x.n).sort((a,b)=>b.n-a.n);
  const cmax=Math.max(1,...chs.map(x=>x.n));
  const hasSample=A.some(a=>a.sample);
- return `${meCard()}${A.length?todayCard():vEmpty()}${lcCard()}
+ return `${todayQueueCard()}${meCard()}${A.length?todayCard():vEmpty()}${lcCard()}
  ${hasSample?`<div class="alert info">ℹ️ 当前包含示例数据，熟悉后可以<a href="#" data-act="clearsample" style="margin-left:4px">一键清除示例</a></div>`:''}
  ${dl.map(a=>`<div class="alert" data-open="${a.id}">⏰ <b>${esc(a.company)}</b> 的 Offer 将在 ${dayDiff(a.offer.deadline,today())===0?'今天':dayDiff(a.offer.deadline,today())+' 天后'}截止答复</div>`).join('')}
  ${goal?`<div class="card goal"><div><div class="t1">本周投递目标</div><div class="t2">${weekN>=goal?'🎉 已完成，继续保持':'还差 '+(goal-weekN)+' 个'}</div></div><div class="bar"><i style="width:${Math.min(100,weekN/goal*100)}%"></i></div><div class="big">${weekN}<span class="t2"> / ${goal}</span></div><button class="btn sm ghost" data-view="settings">调整</button></div>`:''}
