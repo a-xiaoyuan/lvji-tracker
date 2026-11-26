@@ -7,7 +7,7 @@ const ST=[
  {k:'interview',n:'面试中',c:'#5f5a63'},{k:'hr',n:'HR 面',c:'#4b4852'},{k:'offer',n:'Offer',c:'#ff2d87'},
  {k:'rejected',n:'未通过',c:'#dfe2e7'},{k:'dropped',n:'已放弃',c:'#dfe2e7'}];
 const SM=Object.fromEntries(ST.map(s=>[s.k,s]));
-const CH=['Boss直聘','内推','官网','拉勾','猎聘','牛客','校招','猎头','其他'];
+const CH=['Boss直聘','内推','官网','拉勾','猎聘','牛客','智联','前程无忧','校招','猎头','其他'];
 const EV={interview:'面试',test:'笔试/测评',followup:'跟进',offer:'Offer 沟通',note:'备注'};
 const PRI={1:['高','#ff2d87'],2:['中','#787e8a'],3:['低','#c9ced6']};
 const ACTIVE=['applied','test','interview','hr'];

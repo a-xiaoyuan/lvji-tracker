@@ -69,3 +69,10 @@ test('自动记录关掉后不记（手动收藏照样能记）', async () => {
   assert.deepEqual(await x.msg({ type: 'record', item: job, key: 'k4' }), { ok: false, why: 'off' });
   assert.deepEqual(await x.msg({ type: 'record', item: { ...job, status: 'wish' }, key: 'k5', manual: true }), { ok: true });
 });
+
+test('扩展清单：四个招聘网站都挂了内容脚本，文件都在', () => {
+  const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'extension', 'manifest.json'), 'utf8'));
+  const hosts = m.content_scripts.flatMap(c => c.matches).join(' ');
+  for (const h of ['zhipin.com', 'nowcoder.com', 'zhaopin.com', '51job.com']) assert.ok(hosts.includes(h), '清单里缺 ' + h);
+  for (const c of m.content_scripts) for (const f of c.js) assert.ok(fs.existsSync(path.join(ROOT, 'extension', f)), '清单里的文件不存在：' + f);
+});
