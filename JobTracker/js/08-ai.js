@@ -149,6 +149,7 @@ function mkReportHtml(R,qa){return `<div class="mkrep"><div class="mkscore"><b>$
  ${R.better?.length?`<h4 class="mdh">这几题可以这样答</h4>${R.better.map(x=>`<div class="mkbetter"><div class="t1">${fmtAI(x.q)}</div><div class="t2">${fmtAI(x.tip)}</div></div>`).join('')}`:''}
  ${R.weak?.length?`<div class="quick" style="margin-top:10px">${R.weak.map(w=>`<span class="tag">薄弱点 · ${esc(w)}</span>`).join('')}</div>`:''}
  <details class="mklog"><summary>查看完整问答（${qa.length} 题）</summary>${qa.map(x=>`<div class="mkqa"><div class="t1">${x.follow?'↳ 追问：':''}${fmtAI(x.q)}</div><div class="mkans">${esc(x.a)}</div><div class="t2">${'★'.repeat(x.score)}${'☆'.repeat(5-x.score)} ${fmtAI(x.comment)}</div></div>`).join('')}</details></div>`;}
+function mockTrend(){const M=(db.mocks||[]).filter(m=>m.report&&m.report.score!=null);if(M.length<2)return '';const sc=M.slice(-8).map(m=>+m.report.score||0),d=sc[sc.length-1]-sc[0];return `<div class="card sec"><h3>📈 模拟面试分数趋势</h3><div class="t1">${sc.join(' → ')}</div><div class="t2">${d>0?'比这一组第一次进步了 '+d+' 分，继续保持':d<0?'最近比这一组第一次低了 '+(-d)+' 分，去练一轮弱项专项':'分数比较稳，试着换个岗位或加大难度练'}</div></div>`;}
 function renderMock(){if(!MK)return;const b=document.getElementById('aiBody');if(!b)return;const a=MK.aid?appById(MK.aid):null;
  const head=`<div class="mkhead"><span class="tag">${esc(a?a.company:'通用练习')}</span><span class="tag">${esc(MK_KIND[MK.kind].split('：')[0])}</span>${MK.cur||MK.busy&&!MK.report?`<span class="t2">第 ${Math.max(1,MK.main)} / ${MK.n} 题</span>`:''}</div>`;
  const last=MK.qa.at(-1);

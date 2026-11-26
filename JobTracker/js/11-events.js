@@ -109,6 +109,7 @@ document.addEventListener('click',e=>{
   if(act==='ruyeRetry'){ruyeLoaded=false;return showRuye();}
   if(act==='fsave')return formSave();
   if(act==='review')return startReview();
+  if(act==='weakreview')return startReview(true);
   if(act==='jdadd'){const n=JD_MISSING.length;JD_MISSING.forEach(name=>db.skills.push({id:uid(),name,cat:'待分类',level:1,target:3,notes:'从岗位 JD 里加入',link:''}));persist();const nj=document.getElementById('nJD');if(nj)document.getElementById('jdBox').innerHTML=jdHtml(nj.value);else if(openId)renderDrawer();return toast(`已把 ${n} 项加入能力树，去给自己打个分吧`);}
   if(act==='addms'){const d=document.getElementById('msDate').value,t=document.getElementById('msTitle').value.trim();if(!t){document.getElementById('msTitle').focus();return toast('写一下这个里程碑');}db.milestones.push({id:uid(),date:d||today(),title:t});persist();render();return toast('⭐ 已记进你的历程');}
   if(act==='copyreview'){const Rg=pRange(rvU,rvO),c=pStats(Rg),rv=db.reviews[rvU+':'+Rg[0]]||{},lab=rvLab();

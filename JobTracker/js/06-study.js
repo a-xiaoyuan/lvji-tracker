@@ -42,7 +42,10 @@ function jdHtml(text,a){const F=kwFind(text);if(!F.length)return '<div class="t2
 
 /* ========== 抽卡复习（间隔重复） ========== */
 let FC=null;
-function startReview(){const Q=allQuestions().filter(x=>!x.dup&&db.qmark[x.h]!=='ok'&&(!db.qsrs[x.h]||db.qsrs[x.h].due<=today()));
+function weakCounts(events){const M=new Map();for(const e of events||[]){for(const w of (e&&e.weak)||[]){if(w)M.set(w,(M.get(w)||0)+1);}}return [...M.entries()].map(([tag,n])=>({tag,n})).sort((a,b)=>b.n-a.n);}
+function weakQuestions(Q,tags){const T=new Set(tags||[]);if(!T.size)return [];return (Q||[]).filter(x=>x.e&&((x.e.weak)||[]).some(w=>T.has(w)));}
+function startReview(focus){let Q=allQuestions().filter(x=>!x.dup&&db.qmark[x.h]!=='ok'&&(!db.qsrs[x.h]||db.qsrs[x.h].due<=today()));
+ if(focus){const tags=weakCounts(allEvents().map(x=>x.e)).slice(0,3).map(x=>x.tag);Q=weakQuestions(Q,tags);if(!Q.length)return toast('弱项相关的到期题目暂时没有：先在面试复盘或模拟面试里把弱项标出来');}
  if(!Q.length)return toast('没有到期的题目，今天的复习完成了 🎉');
  FC={list:Q.sort(()=>Math.random()-.5).slice(0,20),i:0,show:false,stats:{again:0,hard:0,good:0}};document.getElementById('modal').classList.add('on');renderFC();}
 function renderFC(){const b=document.getElementById('mbox');b.className='card mbox fcard';const x=FC.list[FC.i];
