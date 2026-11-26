@@ -110,3 +110,24 @@ test('dayDiff：按日期算相差几天', () => {
   assert.equal(F.dayDiff('2026-12-01', '2026-11-26'), 5);
   assert.equal(F.dayDiff('2026-11-26', '2026-11-26'), 0);
 });
+
+/* ---------- 简历版本转化率 ---------- */
+const RSV = load(['resumeStats']);
+test('resumeStats：按简历版本算投递数和回复率', () => {
+  const apps = [
+    { status: 'interview', resume: '后端 v3', events: [] },
+    { status: 'applied', resume: '后端 v3', events: [{ type: 'test' }] },
+    { status: 'applied', resume: '后端 v3', events: [] },
+    { status: 'applied', resume: '通用版', events: [] },
+    { status: 'wish', resume: '后端 v3', events: [] },
+    { status: 'rejected', resume: '', events: [] },
+  ];
+  const r = RSV.resumeStats(apps);
+  assert.equal(r.length, 3);
+  assert.equal(r[0].name, '后端 v3');
+  assert.equal(r[0].n, 3);
+  assert.equal(r[0].r, 2);
+  assert.equal(r[0].rate, 67);
+  assert.equal(r.find(x => x.name === '（没记简历）').n, 1);
+  assert.equal(RSV.resumeStats([]).length, 0);
+});
