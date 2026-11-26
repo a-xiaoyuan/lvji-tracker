@@ -110,3 +110,16 @@ test('dayDiff：按日期算相差几天', () => {
   assert.equal(F.dayDiff('2026-12-01', '2026-11-26'), 5);
   assert.equal(F.dayDiff('2026-11-26', '2026-11-26'), 0);
 });
+
+test('海报数据和吉祥物阶段', () => {
+  const F = load(['dayDiff', 'posterStats', 'mascotStage'], { today: () => '2026-11-26' });
+  const d = { settings: { startDate: '2026-11-20' }, milestones: [{ date: '2026-11-21', title: '第一次面试' }], apps: [
+    { status: 'offer', appliedAt: '2026-11-20', events: [{ type: 'interview' }, { type: 'test' }] },
+    { status: 'applied', appliedAt: '2026-11-22', events: [] }] };
+  const S = F.posterStats(d, 42);
+  assert.equal(S.days, 7); assert.equal(S.sent, 2); assert.equal(S.iv, 1); assert.equal(S.ts, 1); assert.equal(S.offers, 1); assert.equal(S.qn, 42);
+  assert.equal(F.mascotStage(d.apps).e, '😎');
+  assert.equal(F.mascotStage([{ status: 'applied', events: [] }]).e, '🏃');
+  assert.equal(F.mascotStage([{ status: 'wish', events: [] }]).e, '🌱');
+  assert.equal(F.mascotStage([{ status: 'applied', events: [{ type: 'interview', done: false }] }]).e, '👔');
+});

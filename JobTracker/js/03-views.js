@@ -82,6 +82,13 @@ function stTag(k){const s=SM[k]||SM.applied;return `<span class="tag" style="bac
 function whenBox(at){const d=new Date(at),ds=dstr(d),dd=dayDiff(ds,today());return `<div class="when ${dd===0?'today':''}"><span>${dd===0?'今天':dd===1?'明天':(d.getMonth()+1)+'月'}</span><b>${dd<=1&&dd>=0?pad(d.getHours())+':'+pad(d.getMinutes()):d.getDate()}</b></div>`;}
 function weekStart(){const m=new Date();m.setHours(0,0,0,0);m.setDate(m.getDate()-((m.getDay()+6)%7));return m;}
 
+function mascotStage(apps){const A=apps||[];
+ if(A.some(a=>a.status==='offer'))return {e:'😎',t:'Offer 在手！稳住，把入职前要准备的做起来。'};
+ if(A.some(a=>['interview','hr'].includes(a.status)||(a.events||[]).some(e=>e.type==='interview'&&!e.done)))return {e:'👔',t:'面试期：穿正装的是我，稳稳答题的也是我。'};
+ if(A.some(a=>a.status!=='wish'))return {e:'🏃',t:'投递进行中，回复在路上，别停。'};
+ return {e:'🌱',t:'求职季开始啦，先把心愿单填满。'};}
+function mascotHtml(){const M=mascotStage(db.apps);
+ return `<div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:16px"><div style="font-size:44px;line-height:1">${M.e}</div><div><div class="t1">履迹小伙伴</div><div class="t2">${esc(M.t)}</div></div></div>`;}
 function vDash(){
  const A=db.apps,sent=A.filter(a=>a.status!=='wish');
  const responded=sent.filter(a=>!['applied','wish'].includes(a.status)||a.events.some(e=>e.type!=='note'&&e.type!=='followup'));
@@ -105,7 +112,7 @@ function vDash(){
  const chs=CH.map(c=>{const L=sent.filter(a=>a.channel===c);return{c,n:L.length,r:L.filter(a=>responded.includes(a)).length};}).filter(x=>x.n).sort((a,b)=>b.n-a.n);
  const cmax=Math.max(1,...chs.map(x=>x.n));
  const hasSample=A.some(a=>a.sample);
- return `${meCard()}${A.length?todayCard():vEmpty()}${lcCard()}
+ return `${meCard()}${A.length?mascotHtml():''}${A.length?todayCard():vEmpty()}${lcCard()}
  ${hasSample?`<div class="alert info">ℹ️ 当前包含示例数据，熟悉后可以<a href="#" data-act="clearsample" style="margin-left:4px">一键清除示例</a></div>`:''}
  ${dl.map(a=>`<div class="alert" data-open="${a.id}">⏰ <b>${esc(a.company)}</b> 的 Offer 将在 ${dayDiff(a.offer.deadline,today())===0?'今天':dayDiff(a.offer.deadline,today())+' 天后'}截止答复</div>`).join('')}
  ${goal?`<div class="card goal"><div><div class="t1">本周投递目标</div><div class="t2">${weekN>=goal?'🎉 已完成，继续保持':'还差 '+(goal-weekN)+' 个'}</div></div><div class="bar"><i style="width:${Math.min(100,weekN/goal*100)}%"></i></div><div class="big">${weekN}<span class="t2"> / ${goal}</span></div><button class="btn sm ghost" data-view="settings">调整</button></div>`:''}
