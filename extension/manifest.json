@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "履迹助手 · Boss 自动记录",
-  "version": "1.0.0",
-  "description": "在 Boss直聘 点「立即沟通」时，自动把岗位记到本机的履迹；HR 发来面试邀请时提醒你建日程。只和本机的履迹通信，不收集任何数据。",
+  "name": "履迹助手 · 投递自动记录",
+  "version": "1.1.0",
+  "description": "在 Boss直聘、牛客网 投递时，自动把岗位记到本机的履迹；HR 发来面试邀请时提醒你建日程。只和本机的履迹通信，不收集任何数据。",
   "icons": { "128": "icon.png" },
   "action": { "default_popup": "popup.html", "default_icon": "icon.png", "default_title": "履迹助手" },
   "background": { "service_worker": "background.js" },
@@ -10,6 +10,7 @@
   "host_permissions": ["http://127.0.0.1:47321/*"],
   "content_scripts": [
     { "matches": ["https://*.zhipin.com/*"], "js": ["content-boss.js"], "run_at": "document_idle" },
+    { "matches": ["https://*.nowcoder.com/*"], "js": ["common.js", "content-nowcoder.js"], "run_at": "document_idle" },
     { "matches": ["http://127.0.0.1:47321/jobs/*"], "js": ["content-app.js"], "run_at": "document_idle" }
   ]
 }

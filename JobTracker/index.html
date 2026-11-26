@@ -107,8 +107,8 @@ a.tag:hover{text-decoration:none;color:var(--accent-ink);background:var(--accent
 .mkrep ul{padding-left:20px;line-height:1.7;margin:4px 0}.mkbetter{border-left:3px solid var(--accent);padding:4px 10px;margin:6px 0}.mklog{margin-top:12px}.mklog summary{cursor:pointer;font-weight:700}.mkqa{border-top:1px dashed var(--line);padding:8px 0}.mkans{margin:4px 0;white-space:pre-wrap;font-size:13px;color:var(--muted)}
 .mockcard{margin-bottom:16px}.mkrow{display:flex;gap:14px;align-items:center}.mkitem{display:flex;gap:10px;align-items:baseline;padding:4px 0;color:inherit;text-decoration:none}.mkitem b{min-width:30px;font-size:18px;font-style:italic}.mkitem:hover span:first-of-type{text-decoration:underline}
 details.intel summary{cursor:pointer;font-size:13px;line-height:1.6}details.intel .aiout{margin-top:8px;max-height:none}.mbox.rvw{width:min(560px,94vw)}
-.board{display:flex;gap:14px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
-.col{flex:0 0 238px;background:var(--soft);border-radius:14px;padding:10px;min-height:200px;transition:background .3s}
+.board{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+.col{flex:1 1 0;min-width:168px;max-width:320px;background:var(--soft);border-radius:14px;padding:10px;min-height:200px;transition:background .3s}
 .col.over{background:var(--accent-soft);outline:2px dashed var(--accent)}
 .col h4{margin:2px 4px 10px;font-size:13.5px;display:flex;align-items:center;gap:7px}
 .col h4 .c{margin-left:auto;color:var(--muted);font-weight:400}
@@ -183,7 +183,8 @@ details.intel summary{cursor:pointer;font-size:13px;line-height:1.6}details.inte
 .tplc code,.tools code{background:var(--soft);border-radius:4px;padding:0 4px;font-size:12px}
 .rm{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
 .rm .quick{margin-top:8px}
-.col.fold{flex:0 0 46px;min-height:260px;padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;color:var(--muted)}
+.col.fold{flex:0 0 46px;min-width:46px;max-width:46px;min-height:260px;padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;color:var(--muted)}
+.col.fold.empty{cursor:default;opacity:.7}.col.fold.empty:hover{background:var(--soft);color:var(--muted)}
 .col.fold:hover{background:var(--accent-soft);color:var(--accent-ink)}
 .col.fold b{writing-mode:vertical-rl;letter-spacing:4px;font-size:13px}
 .col.fold .c{font-size:12px}
@@ -622,7 +623,10 @@ const TPL_VARS=['{公司}','{岗位}','{联系人}','{我}','{投递日期}','{�
 
 /* ========== 数据 ========== */
 function newApp(p={}){return Object.assign({id:uid(),company:'',role:'',city:'',salary:'',channel:'Boss直聘',status:'applied',priority:2,appliedAt:today(),due:'',link:'',site:'',resume:'',contact:'',notes:'',events:[],history:[],offer:{base:'',months:'',bonus:'',stock:'',other:'',wlb:3,growth:3,deadline:''},updatedAt:Date.now()},p);}
-function normalize(d){d=d&&typeof d==='object'?d:{};d.apps=Array.isArray(d.apps)?d.apps.map(a=>{const n=newApp(a);n.offer=Object.assign({wlb:3,growth:3},a.offer||{});n.events=(a.events||[]).map(e=>Object.assign({rating:0,questions:'',review:'',place:'',done:false},e));n.history=a.history||[];return n;}):[];
+function normalize(d){d=d&&typeof d==='object'?d:{};d.apps=Array.isArray(d.apps)?d.apps.filter(a=>a&&typeof a==='object').map(a=>{const n=newApp(a);if(!n.id)n.id=uid();n.offer=Object.assign({wlb:3,growth:3},a.offer&&typeof a.offer==='object'?a.offer:{});n.events=(Array.isArray(a.events)?a.events:[]).filter(e=>e&&typeof e==='object').map(e=>Object.assign({rating:0,questions:'',review:'',place:'',done:false},e,{id:e.id||uid()}));n.history=Array.isArray(a.history)?a.history:[];
+ // 坏数据兜底：字段类型不对、状态不认识、日期不合法时修正，避免整页白屏
+ for(const f of ['company','role','city','salary','channel','link','site','resume','contact','notes','due'])if(typeof n[f]!=='string')n[f]=n[f]==null?'':String(n[f]);
+ if(!ST.some(s=>s.k===n.status))n.status='applied';if(!/^\d{4}-\d{2}-\d{2}$/.test(n.appliedAt||''))n.appliedAt=today();return n;}):[];
  d.settings=Object.assign({weekGoal:10,notify:false,startDate:'',profile:{}},d.settings||{});d.qmark=d.qmark||{};
  d.journal=Array.isArray(d.journal)?d.journal:[];d.habits=Array.isArray(d.habits)?d.habits:DEF_HABITS.map(h=>({...h}));d.skills=Array.isArray(d.skills)?d.skills:[];d.stories=Array.isArray(d.stories)?d.stories:[];d.people=Array.isArray(d.people)?d.people:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.reviews=d.reviews||{};d.milestones=Array.isArray(d.milestones)?d.milestones:[];d.qsrs=d.qsrs||{};d.mocks=Array.isArray(d.mocks)?d.mocks:[];d.chat=Array.isArray(d.chat)?d.chat:[];d.qnote=d.qnote||{};d.tpls=Array.isArray(d.tpls)?d.tpls:DEF_TPL.map(t=>({...t}));
  if(!d.settings.v1SamplesCleaned){const n=d.apps.length;d.apps=d.apps.filter(a=>!(a.sample||/（示例）$/.test(a.company)||/^示例公司 [A-Z]$/.test(a.company)));d.settings.v1SamplesCleaned=true;if(d.apps.length!==n){d.qmark={};d._cleaned=true;}}
@@ -767,7 +771,9 @@ function confetti(n=140){if(RM)return;skHit(innerWidth/2,innerHeight/2,'don',tru
  const C=['#ff2d87','#959ba6','#ff2d87','#ff2d87','#4b4852','#959ba6'];const P=Array.from({length:n},()=>({x:innerWidth/2+(Math.random()-.5)*200,y:innerHeight*.35,vx:(Math.random()-.5)*14,vy:-Math.random()*13-4,s:Math.random()*7+4,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:C[Math.random()*C.length|0]}));
  const t0=performance.now();(function f(now){g.clearRect(0,0,innerWidth,innerHeight);const t=(now-t0)/1000;for(const p of P){p.vy+=.38;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;g.save();g.globalAlpha=Math.max(0,1-t/2.4);g.translate(p.x,p.y);g.rotate(p.r);g.fillStyle=p.c;g.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);g.restore();}if(t<2.4)requestAnimationFrame(f);else c.remove();})(t0);}
 let rsT;function renderSoon(){clearTimeout(rsT);rsT=setTimeout(render,350);}
-function render(){
+// 兜底：某个页面出错时只显示提示，不让整个履迹白屏，其他页面照常能用
+function render(){try{renderInner();}catch(err){console.error(err);const v=document.getElementById('view');if(v)v.innerHTML=`<div class="card" style="padding:22px;max-width:560px"><h3 style="margin:0 0 8px">😵 这个页面出了点问题</h3><div class="t2" style="margin-bottom:12px">你的数据没有丢，其他页面照常能用。可以先切到别的页面，或者把下面这行发给开发者：</div><code style="display:block;white-space:pre-wrap;font-size:12px;background:#0000000d;padding:8px 10px;border-radius:8px">${esc(view+'：'+(err&&err.message||err))}</code><div style="margin-top:14px;display:flex;gap:8px"><button class="btn primary" data-view="dash">回到概览</button><button class="btn" data-view="settings">设置与备份</button></div></div>`;}}
+function renderInner(){
  const upcoming=allEvents().filter(({e})=>!e.done&&e.at&&e.at.slice(0,10)>=today()).length;
  const cnt={agent:agentAlerts(AG.d,Date.now()).length,people:db.people.filter(p=>p.nextAt&&p.nextAt<=today()).length,list:db.apps.length,cal:upcoming,offer:db.apps.filter(a=>a.status==='offer').length,bank:allQuestions().filter(x=>db.qmark[x.h]!=='ok').length};
  document.getElementById('nav').innerHTML=VIEWS.map(([k,n])=>({dash:'<div class="navg">求职</div>',resume:'<div class="navg">我自己</div>',agent:'<div class="navg">工具</div>',settings:'<div class="navg"></div>'}[k]||'')+`<button data-view="${k}" title="${n}" class="${view===k?'on':''}">${svg(k)}${n}${cnt[k]?`<span class="cnt">${cnt[k]}</span>`:''}</button>`).join('');
@@ -833,7 +839,7 @@ function greet(){const h=new Date().getHours(),d=new Date();return `${h<11?'早�
 function vEmpty(){return `<div class="card hero" style="padding:36px 30px;margin-bottom:16px"><div style="font-size:44px">🗂️</div><h2>开始记录你的求职之路</h2><p>投递、笔试、面试、复盘、Offer，全部放在一个地方。数据只保存在你自己的电脑上。</p>
  <button class="btn primary" data-act="add">＋ 新增第一条投递</button>&nbsp;&nbsp;<button class="btn" data-act="bulk">📋 批量粘贴</button>&nbsp;&nbsp;<button class="btn" data-act="web">🌐 浏览器一键添加</button>&nbsp;&nbsp;<button class="btn" data-act="sample">看看示例数据</button>
  <p class="t2" style="margin:16px 0 0">小技巧：在这里直接按 Ctrl+V 粘贴一个岗位链接或一堆文字，会自动帮你新建。</p></div>`;}
-function stTag(k){const s=SM[k];return `<span class="tag" style="background:${s.c}1a;color:${s.c}"><span class="d" style="background:${s.c}"></span>${s.n}</span>`;}
+function stTag(k){const s=SM[k]||SM.applied;return `<span class="tag" style="background:${s.c}1a;color:${s.c}"><span class="d" style="background:${s.c}"></span>${s.n}</span>`;}
 function whenBox(at){const d=new Date(at),ds=dstr(d),dd=dayDiff(ds,today());return `<div class="when ${dd===0?'today':''}"><span>${dd===0?'今天':dd===1?'明天':(d.getMonth()+1)+'月'}</span><b>${dd<=1&&dd>=0?pad(d.getHours())+':'+pad(d.getMinutes()):d.getDate()}</b></div>`;}
 function weekStart(){const m=new Date();m.setHours(0,0,0,0);m.setDate(m.getDate()-((m.getDay()+6)%7));return m;}
 
@@ -904,8 +910,11 @@ function kcard(a){
 let _n=0;
 let FOLD=(()=>{try{return JSON.parse(localStorage.getItem('jt_fold'))||{rejected:1,dropped:1};}catch{return {rejected:1,dropped:1};}})();
 function vBoard(){_n=0;return `<div class="board">${ST.map(s=>{const L=db.apps.filter(a=>a.status===s.k).sort((a,b)=>(a.priority-b.priority)||(b.updatedAt-a.updatedAt));
+ // 收起的列、以及空着的列（待投递除外）都显示成窄条，省出地方给有卡片的列；窄条照样可以把卡片拖进去
  if(FOLD[s.k])return `<div class="col fold" data-col="${s.k}" data-act="fold" data-k="${s.k}" title="点开查看${s.n}（也可以把卡片拖到这里）"><span class="dot" style="background:${s.c}"></span><b>${s.n}</b><span class="c">${L.length}</span></div>`;
- return `<div class="col" data-col="${s.k}"><h4><span class="dot" style="background:${s.c}"></span>${s.n}<span class="c">${L.length}</span>${s.k==='rejected'||s.k==='dropped'?`<button class="foldbtn" data-act="fold" data-k="${s.k}" title="收起">⟨</button>`:''}</h4>${L.map(kcard).join('')}${s.k==='wish'?'<button class="btn sm ghost" data-act="add" data-st="wish" style="width:100%;justify-content:center">＋ 添加</button>':''}</div>`;}).join('')}</div>`;}
+ if(!L.length&&s.k!=='wish')return `<div class="col fold empty" data-col="${s.k}" title="${s.n}：暂时没有，可以把卡片拖到这里"><span class="dot" style="background:${s.c}"></span><b>${s.n}</b><span class="c">0</span></div>`;
+ return `<div class="col" data-col="${s.k}"><h4><span class="dot" style="background:${s.c}"></span>${s.n}<span class="c">${L.length}</span><button class="foldbtn" data-act="fold" data-k="${s.k}" title="收起这一列">⟨</button></h4>${L.map(kcard).join('')}${s.k==='wish'?'<button class="btn sm ghost" data-act="add" data-st="wish" style="width:100%;justify-content:center">＋ 添加</button>':''}</div>`;}).join('')}</div>`;}
+let LIST_LIM=200; // 记录很多时先显示 200 条，点「显示更多」再加载，页面不卡
 function vList(){
  let L=db.apps.filter(a=>(!F.status||a.status===F.status)&&(!F.channel||a.channel===F.channel)&&(!F.q||[a.company,a.role,a.city,a.notes,a.resume].join(' ').toLowerCase().includes(F.q.toLowerCase())));
  const so={updated:(a,b)=>b.updatedAt-a.updatedAt,applied:(a,b)=>(b.appliedAt||'').localeCompare(a.appliedAt||''),company:(a,b)=>a.company.localeCompare(b.company,'zh'),priority:(a,b)=>a.priority-b.priority,status:(a,b)=>ST.findIndex(s=>s.k===a.status)-ST.findIndex(s=>s.k===b.status)};
@@ -916,8 +925,8 @@ function vList(){
  <select class="inp" data-flt="sort">${[['updated','最近更新'],['applied','投递日期'],['priority','优先级'],['status','进度'],['company','公司名']].map(([k,n])=>`<option value="${k}" ${F.sort===k?'selected':''}>按${n}排序</option>`).join('')}</select>
  <span style="color:var(--muted);font-size:13px">${L.length} 条</span><span style="flex:1"></span><button class="btn sm" data-act="hunt" title="联网搜索合适的岗位，一键加进待投递">🧭 AI 找岗位</button><button class="btn sm" data-act="csv" title="导出全部投递，可用 Excel 打开">📊 导出 Excel</button></div>
  <div class="card" style="overflow:hidden"><table><thead><tr><th>公司 / 岗位</th><th>进度</th><th>城市</th><th>薪资</th><th>渠道</th><th>投递日期</th><th>下一步</th><th>链接</th></tr></thead><tbody>
- ${L.map(a=>{const ne=nextEvent(a),p=PRI[a.priority]||PRI[2];return `<tr data-open="${a.id}" style="--n:${_n++}"><td><div class="t1" style="display:flex;align-items:center;gap:7px"><span class="dot" style="background:${p[1]}"></span>${esc(a.company)}</div><div class="t2">${esc(a.role)}</div></td><td>${stTag(a.status)}</td><td>${esc(a.city)}</td><td>${esc(a.salary)}</td><td>${esc(a.channel)}</td><td>${a.appliedAt||''}</td><td>${ne?`<span class="t2">${ne.at.slice(5,16).replace('T',' ')} ${EV[ne.type]}</span>`:'<span class="t2">—</span>'}</td><td style="white-space:nowrap">${ext(safeUrl(a.link),'岗位','tag')} ${ext(safeUrl(a.site),'官网','tag')}${!safeUrl(a.link)&&!safeUrl(a.site)?'<span class="t2">—</span>':''}</td></tr>`;}).join('')||`<tr><td colspan="8"><div class="empty">${db.apps.length?'没有匹配的记录':'还没有投递记录，点右上角「＋ 新增投递」添加第一条'}</div></td></tr>`}
- </tbody></table></div>`;
+ ${L.slice(0,LIST_LIM).map(a=>{const ne=nextEvent(a),p=PRI[a.priority]||PRI[2];return `<tr data-open="${a.id}" style="--n:${_n++}"><td><div class="t1" style="display:flex;align-items:center;gap:7px"><span class="dot" style="background:${p[1]}"></span>${esc(a.company)}</div><div class="t2">${esc(a.role)}</div></td><td>${stTag(a.status)}</td><td>${esc(a.city)}</td><td>${esc(a.salary)}</td><td>${esc(a.channel)}</td><td>${a.appliedAt||''}</td><td>${ne?`<span class="t2">${ne.at.slice(5,16).replace('T',' ')} ${EV[ne.type]}</span>`:'<span class="t2">—</span>'}</td><td style="white-space:nowrap">${ext(safeUrl(a.link),'岗位','tag')} ${ext(safeUrl(a.site),'官网','tag')}${!safeUrl(a.link)&&!safeUrl(a.site)?'<span class="t2">—</span>':''}</td></tr>`;}).join('')||`<tr><td colspan="8"><div class="empty">${db.apps.length?'没有匹配的记录':'还没有投递记录，点右上角「＋ 新增投递」添加第一条'}</div></td></tr>`}
+ </tbody></table>${L.length>LIST_LIM?`<div style="padding:12px;text-align:center"><button class="btn" data-act="listmore">显示更多（还有 ${L.length-LIST_LIM} 条）</button></div>`:''}</div>`;
 }
 function vCal(){
  const E=allEvents().filter(({e})=>e.at).sort((x,y)=>x.e.at.localeCompare(y.e.at));
@@ -999,7 +1008,7 @@ function vSettings(){
   <div class="row" style="margin-top:8px"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" class="chk" data-set="bgNotify" ${db.settings.bgNotify!==false?'checked':''} ${TOKEN?'':'disabled'}>履迹关着时也提醒（Windows 通知，由本机小助手发出）</label></div>
   <div class="row" style="margin-top:8px"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" class="chk" data-set="digest" ${db.settings.digest!==false?'checked':''} ${TOKEN?'':'disabled'}>每天早上发一条今日汇总</label><select class="inp" data-set="digestHour" style="width:auto" ${TOKEN?'':'disabled'}>${[7,8,9,10,11].map(h=>`<option value="${h}" ${+(db.settings.digestHour??9)===h?'selected':''}>${h}:00</option>`).join('')}</select><span class="t2">今天的面试、快截止的 Offer 和岗位、该跟进的人、该复习的题</span></div></div>
  <div class="card set"><h3>ℹ️ 关于履迹</h3><p>当前版本：<b>${esc(document.querySelector('meta[name="lvji-version"]')?.content||'自用版')}</b>。拿到新的安装包后，双击里面的「安装或更新」就能升级，投递记录、简历和设置都会保留。数据保存在「文档\\求职进度」文件夹。</p></div>
- <div class="card set" id="extCard"><h3>🔗 Boss 自动记录</h3><p>装上浏览器扩展「履迹助手」后，在 Boss直聘 网页上点「立即沟通」就会自动记到履迹（已投递）；HR 在聊天里约面试时，会自动交给 AI 识别并提醒你建日程。它只读你正在看的页面，不会替你点任何按钮，也不碰你的账号。Boss 手机 App 上的操作记不到。</p>
+ <div class="card set" id="extCard"><h3>🔗 投递自动记录（Boss直聘 · 牛客网）</h3><p>装上浏览器扩展「履迹助手」后：在 Boss直聘 网页上点「立即沟通」、在牛客网职位页「立即申请」并确认后，都会自动记到履迹（已投递）；牛客上跳去公司官网网申的，先记成「待投递」提醒你填完。Boss 的 HR 在聊天里约面试时，会自动交给 AI 识别并提醒你建日程。它只读你正在看的页面，不会替你点任何按钮，也不碰你的账号。手机 App 上的操作记不到。</p>
  <ol class="t2" style="margin:4px 0 10px;padding-left:20px;line-height:2"><li>点下面「打开扩展文件夹」</li><li>在 Edge 地址栏输入 <code>edge://extensions</code> 回车（Chrome 是 <code>chrome://extensions</code>），打开左边或右上角的「开发人员模式」</li><li>点「加载解压缩的扩展」，选刚才打开的那个文件夹</li><li>关掉履迹再从桌面打开一次，扩展就自动连上了</li></ol>
  <div class="row" style="flex-wrap:wrap;gap:8px"><button class="btn" data-act="extopen">📂 打开扩展文件夹</button><button class="btn ghost" data-act="extcopy">复制 edge://extensions</button><span class="t2" id="extStat">${TOKEN?'检查中…':''}</span></div></div>
  <div class="card set"><h3>🧩 力扣同步</h3><p>填上力扣（leetcode.cn）用户名，概览页会显示刷题数、提交热力图、每日一题和最近通过的题，打开履迹时和之后每 30 分钟自动同步。只读取公开主页，不需要登录，也不要密码。用户名就是个人主页网址 leetcode.cn/u/<b>这一段</b>/，直接粘贴主页网址也行。</p><div class="row" style="flex-wrap:wrap;gap:8px"><input class="inp" id="lcU" value="${esc(db.settings.lcUser||'')}" placeholder="如：zhang-san" style="width:220px"><button class="btn primary" data-act="lcsave">${db.settings.lcUser?'保存并同步':'连接'}</button>${db.settings.lcUser?'<button class="btn ghost" data-act="lcoff">断开</button>':''}<span class="t2" id="lcStat">${db.lcErr?'😵 '+esc(db.lcErr):db.lc?`✓ 已连上 ${esc(db.lc.name)}，累计 ${db.lc.solved.all} 题，${ago(db.lc.at,Date.now())}同步`:''}</span></div></div>
@@ -2104,6 +2113,7 @@ document.addEventListener('click',e=>{
   if(act==='addtpl')return editTpl();
   if(act==='resettpl'){db.tpls=DEF_TPL.map(t=>({...t}));persist();return render();}
   if(act==='copymiss')return copyText(actEl.dataset.k,'已复制，去简历里补上会的那些');
+  if(act==='listmore'){LIST_LIM+=300;return render();}
   if(act==='csv'){download(`履迹-投递记录-${today()}.csv`,toCSV(),'text/csv;charset=utf-8');return toast(`已导出 ${db.apps.length} 条，可以直接用 Excel 打开`);}
   if(act==='fold'){const k=actEl.dataset.k;FOLD[k]=FOLD[k]?0:1;localStorage.setItem('jt_fold',JSON.stringify(FOLD));return render();}
   if(act==='add')return openAdd(actEl.dataset.st);
@@ -2287,7 +2297,7 @@ async function pullInbox(){if(!TOKEN||inboxBusy)return;inboxBusy=true;
    if(looksInvite(t))inv={t,aid:a?.id||''};else chatMsg.push(a);}
   if(fresh.length){persist();flushSave();render();
    const msg=[added.length&&`收进 ${added.length} 条：${added.slice(0,5).join('、')}${added.length>5?' 等':''}`,upd.length&&`更新 ${upd.length} 条：${upd.slice(0,3).join('、')}`,chatMsg.length&&`${chatMsg.filter(Boolean).map(a=>a.company).join('、')||'一段'} 聊天已存进备注`].filter(Boolean).join('；');
-   if(msg)toast((fresh.every(x=>x.auto)?'🔗 Boss 自动记录 · ':'📥 ')+msg,chatMsg[0]?['查看',()=>openDrawer(chatMsg[0].id)]:null,6000);
+   if(msg)toast((fresh.every(x=>x.auto)?'🔗 自动记录 · ':'📥 ')+msg,chatMsg[0]?['查看',()=>openDrawer(chatMsg[0].id)]:null,6000);
    if(inv){const go=()=>{openInvite(inv.t,inv.aid);setTimeout(invGo,60);};if(!document.getElementById('modal').classList.contains('on'))go();else toast('📥 收到一段像面试邀请的 Boss 聊天',['识别并建日程',go],20000);}}
   await fetch(INBOX,{method:'DELETE',headers:{'x-token':TOKEN,'content-type':'application/json'},body:JSON.stringify({ids:items.map(x=>x.id)})});
  }catch{}finally{inboxBusy=false;}}
