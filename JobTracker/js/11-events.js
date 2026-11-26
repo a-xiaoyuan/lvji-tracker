@@ -17,7 +17,7 @@ document.addEventListener('click',e=>{
  if(/^SAKUGA-(CHECKBOX|TOGGLE|SLIDER)$/.test(T.tagName)&&!e.skChange)return;
  if(T.closest('[data-done]')){const [aid,eid]=T.closest('[data-done]').dataset.done.split('|');const a=appById(aid),ev=a.events.find(x=>x.id===eid);ev.done=T.checked;touch(a);render();e.stopPropagation();return;}
  const pr=T.closest('[data-prep]');if(pr){const [aid,eid,i]=pr.dataset.prep.split('|'),a=appById(aid),ev=a?.events.find(x=>x.id===eid);if(ev){ev.prep=ev.prep||{};ev.prep[i]=pr.checked;touch(a);const h=pr.closest('.ps')?.querySelector('h4 .t2');if(h)h.textContent=`${PREP_ITEMS.filter((_,k)=>ev.prep[k]).length}/${PREP_ITEMS.length}`;}return;}
- const tc=T.closest('[data-tplcopy]');if(tc){e.preventDefault();const t=db.tpls.find(x=>x.id===tc.dataset.tplcopy);if(t)copyText(tplFill(t.body,openId?appById(openId):null),openId?`已复制「${t.title}」，已填好 ${appById(openId)?.company||''} 的信息`:`已复制「${t.title}」`);return;}
+ const tc=T.closest('[data-tplcopy]');if(tc){e.preventDefault();const t=db.tpls.find(x=>x.id===tc.dataset.tplcopy);if(t){const oa=openId?appById(openId):null;if(oa){oa.tplUse=oa.tplUse||[];oa.tplUse.push({tpl:t.id,at:today()});persist();}copyText(tplFill(t.body,openId?appById(openId):null),openId?`已复制「${t.title}」，已填好 ${appById(openId)?.company||''} 的信息`:`已复制「${t.title}」`);}return;}
  const te=T.closest('[data-tpledit]');if(te){editTpl(db.tpls.find(x=>x.id===te.dataset.tpledit));return;}
  const nv=T.closest('[data-view]');if(nv){e.preventDefault();view=nv.dataset.view;if(openId)closeDrawer();render();document.querySelector('main').scrollTop=0;return;}
  const actEl=T.closest('[data-act]'),act=actEl?.dataset.act;

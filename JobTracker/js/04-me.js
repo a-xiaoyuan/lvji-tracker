@@ -57,7 +57,7 @@ function copyText(t,msg){navigator.clipboard.writeText(t).then(()=>toast(msg||'�
 function vTpl(){
  return `<div class="tools"><span class="t2">可用变量：${TPL_VARS.map(v=>`<code>${v}</code>`).join(' ')}　在投递详情里点模板，会自动填好那家公司的信息</span><span style="flex:1"></span><button class="btn primary sm" data-act="addtpl">＋ 新模板</button></div>
  <div class="skgrid" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr))">${db.tpls.map(t=>`<div class="card sk tplc"><div style="display:flex;align-items:center;gap:8px"><div class="t1" style="flex:1">${esc(t.title)}</div><button class="btn sm ghost" data-tpledit="${t.id}">编辑</button><button class="btn sm" data-tplcopy="${t.id}">📋 复制</button></div><div class="t2 tplb">${esc(t.body).replace(/\{(公司|岗位|联系人|我|投递日期|技能)\}/g,'<mark>{$1}</mark>')}</div></div>`).join('')}</div>
- ${db.tpls.length?'':'<div class="card empty">还没有模板。<a href="#" data-act="resettpl">恢复默认模板</a></div>'}`;
+ ${db.tpls.length?'':'<div class="card empty">还没有模板。<a href="#" data-act="resettpl">恢复默认模板</a></div>'}${tplStatsCard()}`;
 }
 function editTpl(x){const isNew=!x;x=x||{id:uid(),title:'',body:''};
  openForm(isNew?'新话术模板':'编辑话术模板',[['title','名称 *','text','',true],['body','内容（可用 '+TPL_VARS.join(' ')+'）','textarea','',true]],x,

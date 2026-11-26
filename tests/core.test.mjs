@@ -110,3 +110,23 @@ test('dayDiff：按日期算相差几天', () => {
   assert.equal(F.dayDiff('2026-12-01', '2026-11-26'), 5);
   assert.equal(F.dayDiff('2026-11-26', '2026-11-26'), 0);
 });
+
+test('话术效果、人脉雷达、时机洞察、海投疲劳', () => {
+  const F = load(['dayDiff', 'appReplied', 'tplStats', 'peopleNamesFor', 'jobInsights', 'fatigueTip'], { today: () => '2026-11-26' });
+  const tpls = [{ id: 't1', title: '打招呼' }, { id: 't2', title: '内推' }];
+  const apps = [
+    { status: 'interview', tplUse: [{ tpl: 't1' }] }, { status: 'applied', tplUse: [{ tpl: 't1' }] }, { status: 'applied', tplUse: [{ tpl: 't2' }] }];
+  const S = F.tplStats(apps, tpls);
+  assert.equal(S[0].id, 't1'); assert.equal(S[0].used, 2); assert.equal(S[0].replied, 1);
+  assert.equal(F.peopleNamesFor('字节跳动', [{ name: '张三', company: '字节' }]).join(','), '张三');
+  assert.equal(F.peopleNamesFor('美团', [{ name: '张三', company: '字节' }]).length, 0);
+  const many = [];
+  for (let i = 0; i < 5; i++) many.push({ status: 'interview', channel: '官网', appliedAt: '2026-11-24', events: [{ type: 'interview', at: '2026-11-26 10:00' }] });
+  for (let i = 0; i < 5; i++) many.push({ status: 'applied', channel: 'Boss直聘', appliedAt: '2026-11-25', events: [] });
+  const ins = F.jobInsights(many).join(' ');
+  assert.ok(ins.includes('周二') && ins.includes('官网回复最快'), ins);
+  const tired = []; for (let i = 0; i < 6; i++) tired.push({ status: 'applied', appliedAt: '2026-11-25', events: [] });
+  assert.ok(F.fatigueTip(tired).length > 0);
+  tired[0].status = 'interview';
+  assert.equal(F.fatigueTip(tired), '');
+});
