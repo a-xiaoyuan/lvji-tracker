@@ -37,7 +37,8 @@ jobs:
           mkdir -p ../Ruye && cp -r apps/web/dist/. ../Ruye/
           cp ../打包/ruye-icon/*.ico ../Ruye/
       - name: 打安装包（含隐私检查）
-        shell: powershell
+        # 用 PowerShell 7 跑这一段：Windows PowerShell 5.1 读不带 BOM 的脚本时会把中文路径读成乱码
+        shell: pwsh
         env:
           LVJI_NO_PAUSE: '1'
         run: |
