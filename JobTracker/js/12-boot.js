@@ -30,7 +30,7 @@ db=(()=>{const raw=localStorage.getItem(KEY);if(!raw)return normalize({});try{re
 if(db._cleaned){delete db._cleaned;db.savedAt=Date.now();localStorage.setItem(KEY,JSON.stringify(db));}
 if(START_VIEW&&VIEWS.some(v=>v[0]===START_VIEW))view=START_VIEW;
 applyTheme();renderSync();render();pull();
-setInterval(checkReminders,30000);setTimeout(checkReminders,1500);setInterval(rvPrompt,60000);setTimeout(rvPrompt,4000);
+setInterval(checkReminders,30000);setTimeout(checkReminders,1500);setTimeout(()=>{try{autoScanSubs();}catch(_){}},6000);setInterval(rvPrompt,60000);setTimeout(rvPrompt,4000);
 renderFocus();setInterval(tickFocus,1000);
 document.addEventListener('paste',e=>{const t=e.target;if(/INPUT|TEXTAREA|SELECT/.test(t.tagName)||t.isContentEditable||document.getElementById('modal').classList.contains('on')||openId||view==='resume')return;
  const txt=(e.clipboardData?.getData('text')||'').trim();if(!txt)return;e.preventDefault();const lines=txt.split(/\r?\n/).filter(l=>l.trim());
