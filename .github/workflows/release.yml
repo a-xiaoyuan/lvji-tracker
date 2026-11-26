@@ -47,7 +47,8 @@ jobs:
           $zip = Get-ChildItem ([Environment]::GetFolderPath('Desktop')) -Filter '履迹-安装包-*.zip' | Select-Object -First 1
           if (-not $zip) { Write-Error '没有生成安装包'; exit 1 }
           New-Item -ItemType Directory -Force dist | Out-Null
-          Move-Item $zip.FullName dist/
+          # GitHub 会把附件文件名里的中文去掉，所以上传时用英文名（zip 里面的文件夹还是中文）
+          Move-Item $zip.FullName ("dist/" + ($zip.Name -replace '^.*安装包-', 'lvji-setup-'))
       - uses: actions/upload-artifact@v4
         with:
           name: 履迹安装包
@@ -57,4 +58,4 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "履迹 $GITHUB_REF_NAME" --notes "下载下面的安装包 zip，解压后双击「安装或更新.cmd」。没装 Node.js 的话，安装程序会提示自动安装。"
+        run: f=$(ls dist/*.zip); gh release create "$GITHUB_REF_NAME" "$f#履迹安装包（Windows）" --title "履迹 $GITHUB_REF_NAME" --notes "下载下面的安装包 zip，解压后双击「安装或更新.cmd」。没装 Node.js 的话，安装程序会提示自动安装。"
