@@ -15,17 +15,37 @@ Say "履迹 $Ver" Magenta
 Say "────────────────────────────"
 
 # 1. Node.js（后台助手要用）
-$node = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
-if (-not $node) {
-  foreach ($p in @("$env:ProgramFiles\nodejs\node.exe", "${env:ProgramFiles(x86)}\nodejs\node.exe", "$env:LOCALAPPDATA\Programs\nodejs\node.exe")) { if (Test-Path $p) { $node = $p; break } }
+function Find-Node {
+  $n = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
+  if ($n) { return $n }
+  foreach ($p in @("$env:ProgramFiles\nodejs\node.exe", "${env:ProgramFiles(x86)}\nodejs\node.exe", "$env:LOCALAPPDATA\Programs\nodejs\node.exe")) { if (Test-Path $p) { return $p } }
 }
-if (-not $node) {
-  Say "还没有安装 Node.js（履迹的后台助手需要它，免费）。" Yellow
-  Say "马上帮你打开下载页：选「LTS 长期支持版」的 Windows 安装包，一路下一步装好，再双击一次「安装或更新」。" Yellow
-  Start-Process 'https://nodejs.org/zh-cn/download'
-  Fail '请先安装 Node.js'
+function Node-Major($n) { try { [int]((& $n -v).TrimStart('v').Split('.')[0]) } catch { 0 } }
+$node = Find-Node
+if (-not $node -or (Node-Major $node) -lt 18) {
+  if ($node) { Say "电脑上的 Node.js 版本太旧（$((& $node -v))），履迹的后台助手需要 18 或更新的版本。" Yellow }
+  else { Say "还没有安装 Node.js（履迹的后台助手需要它，免费、官方出品）。" Yellow }
+  $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+  $ok = $false
+  if ($winget -and $env:LVJI_NO_NODE_INSTALL -ne '1') {
+    Say "可以用 Windows 自带的 winget 帮你装好 Node.js 长期支持版（约 30MB，会弹出一次管理员确认）。" Gray
+    $ans = Read-Host '现在自动安装吗？直接回车 = 是，输入 n = 不用'
+    if ($ans -notmatch '^[nN]') {
+      & $winget.Source install -e --id OpenJS.NodeJS.LTS --source winget --accept-source-agreements --accept-package-agreements
+      # 刚装好的程序还不在这个窗口的 PATH 里，重新读一次
+      $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+      $node = Find-Node
+      $ok = $node -and (Node-Major $node) -ge 18
+      if (-not $ok) { Say "自动安装没成功，改用手动安装。" Yellow }
+    }
+  }
+  if (-not $ok) {
+    Say "马上帮你打开下载页：选「LTS 长期支持版」的 Windows 安装包，一路下一步装好，再双击一次「安装或更新」。" Yellow
+    Start-Process 'https://nodejs.org/zh-cn/download'
+    Fail '请先安装 Node.js'
+  }
 }
-$nv = (& $node -v).TrimStart('v'); if ([int]($nv.Split('.')[0]) -lt 18) { Fail "Node.js 版本太旧（$nv），需要 18 或更新的版本：https://nodejs.org/zh-cn/download" }
+$nv = (& $node -v).TrimStart('v')
 Say "✓ Node.js $nv" Green
 
 # 2. 已经装过：先停掉正在运行的助手，备份旧版本

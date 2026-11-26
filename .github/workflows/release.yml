@@ -17,6 +17,25 @@ jobs:
           node-version: 22
       - name: 运行测试
         run: npm test
+      # 如页不放在仓库里：每次发布从它的源码编译（固定到一个提交，保证每次结果一样）
+      - uses: actions/checkout@v4
+        with:
+          repository: a-xiaoyuan/ruye-resume
+          ref: aadc7f576428e69fe543f0ba180d1b31ab52ecdc
+          path: _ruye
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+      - name: 编译如页
+        shell: bash
+        working-directory: _ruye
+        run: |
+          pnpm install --frozen-lockfile=false
+          python -m pip install --quiet fonttools
+          pnpm fonts
+          pnpm build
+          mkdir -p ../Ruye && cp -r apps/web/dist/. ../Ruye/
+          cp ../打包/ruye-icon/*.ico ../Ruye/
       - name: 打安装包（含隐私检查）
         shell: powershell
         env:
@@ -37,4 +56,4 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "履迹 $GITHUB_REF_NAME" --notes "下载下面的安装包 zip，解压后双击「安装或更新.cmd」。需要先装 Node.js 22 或更高版本。"
+        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "履迹 $GITHUB_REF_NAME" --notes "下载下面的安装包 zip，解压后双击「安装或更新.cmd」。没装 Node.js 的话，安装程序会提示自动安装。"

@@ -24,6 +24,9 @@ foreach ($d in 'JobTracker', 'Ruye', 'helper', 'extension') {
   $null = robocopy (Join-Path $Apps $d) "$Stage\app\$d" /MIR /XF $skip /XD node_modules .git /NFL /NDL /NJH /NJS /NP
   if ($LASTEXITCODE -ge 8) { Fail "复制 $d 失败" }
 }
+if (-not (Test-Path "$Stage\app\Ruye\index.html")) { Fail '缺少如页（Ruye\index.html）。先运行 打包\get-ruye.ps1' }
+# 如页的图标：已有（比如你自己换过的）就不动，没有就用默认的
+foreach ($f in 'app.ico', 'ruye-avatar.ico') { if (-not (Test-Path "$Stage\app\Ruye\$f")) { Copy-Item "$PSScriptRoot\ruye-icon\$f" "$Stage\app\Ruye\" } }
 [IO.File]::WriteAllText("$Stage\app\VERSION", $Ver, $utf8)
 # 版本号写进页面，设置 → 关于履迹 里显示
 $idx = "$Stage\app\JobTracker\index.html"

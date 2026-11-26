@@ -7,6 +7,7 @@
   if (window.__lvjiNk) return; window.__lvjiNk = true;
   const { T, q, cityOf, send, whyText, makeChip } = window.LV;
   const CH = '牛客'; // 和履迹里的渠道名一致，方便按渠道筛选
+  const miss = (stage, why) => window.LV.miss('牛客网', stage, why);
   const isDetail = () => /\/jobs\/detail\/\d+/.test(location.pathname);
 
   function jobInfo() {
@@ -47,8 +48,10 @@
       return;
     }
     if (isDetail() && APPLY.test(t)) {
-      const j = jobInfo(); if (!j.company && !j.role) return;
-      pending = { j, at: Date.now(), btn: b };
+      const j = jobInfo(); if (!j.company && !j.role) { miss('点立即申请', '点了「' + t + '」，但页面上没认出公司和岗位（可能是牛客改版了）'); chip.flash('这次没认出岗位，已记进自检记录', true); return; }
+      const mine = pending = { j, at: Date.now(), btn: b };
+      // 3 分钟内既没看到确认按钮被点、也没看到「已申请」：记一笔（也可能只是你取消了）
+      setTimeout(() => { if (pending === mine) { pending = null; miss('确认投递', `点了「立即申请」后 3 分钟内没看到投递成功（如果是你自己取消的可以忽略）：${j.company} ${j.role}`); } }, 3 * 60e3);
       // 一键投递：按钮文字变成「已申请」
       let n = 0; const iv = setInterval(() => {
         if (!pending || ++n > 20) return clearInterval(iv);
@@ -62,4 +65,17 @@
   }, true);
 
   const chip = makeChip({ isJobPage: () => isDetail() && !!document.querySelector('.job-detail-wrap,h1'), getJob: jobInfo, channel: CH });
+
+  // 自检：打开职位页 5 秒后试读一次，读不出就记一笔
+  let checked = '';
+  setInterval(() => {
+    const p = location.pathname;
+    if (checked === p || !isDetail()) return;
+    checked = p;
+    setTimeout(() => {
+      const j = jobInfo();
+      const lost = [!j.company && '公司', !j.role && '岗位', !j.jd && '职位描述', !document.querySelector('.job-detail-wrap') && '职位信息区'].filter(Boolean);
+      if (lost.length) miss('读取职位页', `职位页上没认出：${lost.join('、')}`);
+    }, 5000);
+  }, 2000);
 })();

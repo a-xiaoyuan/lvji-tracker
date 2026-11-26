@@ -35,7 +35,7 @@ const AGENT_ON_FILE = path.join(STATE, 'agent-on.txt');
 const agentOn = () => fs.existsSync(AGENT_ON_FILE);
 const SNAP_DIR = path.join(BACKUP_DIR, '恢复前');
 const EXT_DIR = path.resolve(HERE, '..', 'extension'); // 浏览器扩展「履迹助手」
-let extSeen = 0, extVer = '';
+let extSeen = 0, extVer = '', extDiag = [];
 let lastSeen = 0; // 履迹页面最后一次带密钥访问的时间，用来判断窗口是否开着
 
 /* ---------- 履迹关着时的面试提醒（Windows 通知） ---------- */
@@ -197,8 +197,17 @@ async function api(req, res) {
   }
   if (!tokenOk(req)) return send(res, 401, { error: 'token' });
   if (req.url === '/api/ai/status' && req.method === 'GET') return send(res, 200, aiStatus());
-  if (req.url === '/api/ext/hello' && req.method === 'POST') { try { extVer = String(JSON.parse(await readBody(req, 1024)).v || '').slice(0, 20); } catch {} extSeen = Date.now(); return send(res, 200, { ok: true }); }
-  if (req.url === '/api/ext/status' && req.method === 'GET') return send(res, 200, { seen: extSeen, ver: extVer, dir: fs.existsSync(path.join(EXT_DIR, 'manifest.json')) ? EXT_DIR : '' });
+  if (req.url === '/api/ext/hello' && req.method === 'POST') {
+    try {
+      const b = JSON.parse(await readBody(req, 16 * 1024));
+      extVer = String(b.v || '').slice(0, 20);
+      // 扩展的自检记录：最近没记上的情况，履迹设置页里显示
+      if (Array.isArray(b.diag)) extDiag = b.diag.slice(0, 10).filter(d => d && typeof d === 'object')
+        .map(d => ({ at: +d.at || 0, site: String(d.site || '').slice(0, 20), stage: String(d.stage || '').slice(0, 40), why: String(d.why || '').slice(0, 200), url: String(d.url || '').slice(0, 200) }));
+    } catch {}
+    extSeen = Date.now(); return send(res, 200, { ok: true });
+  }
+  if (req.url === '/api/ext/status' && req.method === 'GET') return send(res, 200, { seen: extSeen, ver: extVer, diag: extDiag, dir: fs.existsSync(path.join(EXT_DIR, 'manifest.json')) ? EXT_DIR : '' });
   if (req.url === '/api/ext/open' && req.method === 'POST') {
     if (!fs.existsSync(path.join(EXT_DIR, 'manifest.json'))) return send(res, 404, { error: '没找到扩展文件夹' });
     spawn('explorer.exe', [EXT_DIR], { detached: true, stdio: 'ignore' }).unref();
@@ -322,7 +331,8 @@ async function serveStatic(req, res) {
     const ext = path.extname(file).toLowerCase();
     res.writeHead(200, {
       'content-type': MIME[ext] || 'application/octet-stream', 'content-length': st.size,
-      'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=604800',
+      // 履迹自己的页面、脚本、样式每次都重新取（更新后不会新旧混用）；如页的带哈希文件名资源可以长期缓存
+      'cache-control': ext === '.html' || (root === JOBS && (ext === '.js' || ext === '.css')) ? 'no-cache' : 'public, max-age=604800',
       'x-content-type-options': 'nosniff',
     });
     if (req.method === 'HEAD') return res.end();

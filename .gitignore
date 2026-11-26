@@ -12,3 +12,6 @@ _旧版本/
 履迹-安装包-*.zip
 helper/digest-sent.txt
 helper/agent-on.txt
+
+# 如页的构建产物：不进仓库，发布时从 ruye-resume 源码编译（本地开发用 打包/get-ruye.ps1 取）
+Ruye/

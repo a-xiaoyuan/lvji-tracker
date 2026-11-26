@@ -8,6 +8,8 @@
   const CT = '北京 上海 广州 深圳 杭州 南京 成都 武汉 西安 苏州 天津 重庆 长沙 厦门 合肥 郑州 青岛 济南 大连 珠海 东莞 佛山 宁波 无锡 福州 昆明 沈阳 哈尔滨 香港 新加坡 远程'.split(' ');
   const cityOf = s => CT.find(c => (s || '').includes(c)) || '';
   const send = (item, key, manual) => new Promise(res => { try { chrome.runtime.sendMessage({ type: 'record', item, key, manual }, r => res(r || { ok: false, why: chrome.runtime.lastError?.message || '' })); } catch (e) { res({ ok: false, why: '扩展已更新，请刷新这个页面' }); } });
+  // 自检：没认出页面时告诉扩展后台记一笔
+  const miss = (site, stage, why) => { try { chrome.runtime.sendMessage({ type: 'miss', site, stage, why, url: location.href }, () => void chrome.runtime.lastError); } catch {} };
   const hash = s => { let h = 0; for (const c of s) h = (h * 31 + c.codePointAt(0)) | 0; return (h >>> 0).toString(36); };
   const whyText = r => r.why === '未配对' ? '履迹还没连上：先打开一次履迹' : '没记上：' + (r.why || '履迹没开');
 
@@ -41,5 +43,5 @@
     return { flash };
   }
 
-  window.LV = { T, first, q, cityOf, send, hash, whyText, makeChip };
+  window.LV = { T, first, q, cityOf, send, hash, whyText, makeChip, miss };
 })();

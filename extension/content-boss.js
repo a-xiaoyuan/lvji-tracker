@@ -12,6 +12,8 @@
   const cityOf = s => CT.find(c => (s || '').includes(c)) || '';
   const sal = s => /\d/.test(s || '') ? s.replace(/[-]/g, '').slice(0, 40) : ''; // Boss 列表页薪资用了加密字体，读不出就留空
   const CARD = '.job-card-box,.job-card-wrapper,.job-card-wrap,[class*=job-card]';
+  // 自检：没认出页面时告诉扩展后台记一笔（网站改版时能马上知道是哪一步坏了）
+  const miss = (stage, why) => { try { chrome.runtime.sendMessage({ type: 'miss', site: 'Boss直聘', stage, why, url: location.href }, () => void chrome.runtime.lastError); } catch {} };
   const send = (item, key, manual) => new Promise(res => { try { chrome.runtime.sendMessage({ type: 'record', item, key, manual }, r => res(r || { ok: false, why: chrome.runtime.lastError?.message || '' })); } catch (e) { res({ ok: false, why: '扩展已更新，请刷新这个页面' }); } });
 
   // ---------- 读取岗位信息 ----------
@@ -47,7 +49,8 @@
     const t = T(b).replace(/\s+/g, '');
     if (!APPLY.test(t)) return;
     const j = jobInfo(b);
-    if (!j.company && !j.role) return;
+    if (!j.company && !j.role) { miss('点立即沟通', '点了「' + t + '」，但页面上没认出公司和岗位（可能是 Boss 改版了）'); chip.flash('这次没认出岗位，已记进自检记录', true); return; }
+    if (!j.company || !j.role) miss('点立即沟通', `只认出了${j.company ? '公司' : '岗位'}，没认出${j.company ? '岗位' : '公司'}`);
     setTimeout(async () => {
       const r = await send({ kind: 'job', status: 'applied', channel: 'Boss直聘', ...j }, keyOf(j) + '|applied');
       if (r.ok && !r.dup) chip.flash(`✓ 已记到履迹：${j.company || ''} · ${j.role || ''}`);
@@ -77,8 +80,12 @@
       if (r.ok && !r.dup) chip.flash(`📅 发现${h.company ? ' ' + h.company + ' 的' : ''}面试邀请，已交给履迹建日程`);
     });
   }
+  let chatSince = 0;
   setInterval(() => {
-    if (!/chat/.test(location.pathname)) { if (obs) { obs.disconnect(); obs = null; box = null; } return; }
+    if (!/chat/.test(location.pathname)) { chatSince = 0; if (obs) { obs.disconnect(); obs = null; box = null; } return; }
+    if (!chatSince) chatSince = Date.now();
+    // 在聊天页待了 20 秒还没找到消息区：多半是页面结构变了
+    if (!box && Date.now() - chatSince > 20e3 && chatSince > 0) { chatSince = -1; miss('聊天页', '在聊天页没找到消息区，面试邀请暂时识别不了（可能是 Boss 改版了）'); }
     let b = null;
     for (const s of ['.chat-conversation .chat-message', '.chat-message-list', '.message-list', '.chat-record', '[class*=message-list]', '.chat-conversation']) { const e = document.querySelector(s); if (e && T(e).length > 10) { b = e; break; } }
     if (b && b !== box) { if (obs) obs.disconnect(); box = b; obs = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(checkChat, 1200); }); obs.observe(b, { childList: true, subtree: true, characterData: true }); setTimeout(checkChat, 800); }
@@ -114,4 +121,18 @@
     mount();
     return { flash };
   })();
+
+  // 自检：打开岗位详情页 5 秒后试读一次，读不出公司或岗位就记一笔（不用等你点按钮才发现坏了）
+  let checked = '';
+  setInterval(() => {
+    const p = location.pathname;
+    if (checked === p || !/job_detail/.test(p)) return;
+    if (!document.querySelector('.job-banner,.job-detail-box,.job-detail-container,.job-sec-text')) return;
+    checked = p;
+    setTimeout(() => {
+      const j = jobInfo(document.querySelector('.job-detail-box,.job-banner,.job-detail-container'));
+      const lost = [!j.company && '公司', !j.role && '岗位', !j.jd && '职位描述'].filter(Boolean);
+      if (lost.length) miss('读取岗位页', `岗位页上没认出：${lost.join('、')}`);
+    }, 5000);
+  }, 2000);
 })();

@@ -19,7 +19,7 @@
 
 ## 安装（Windows）
 
-需要 [Node.js](https://nodejs.org/zh-cn/download) 22 或更高版本（选 LTS）。
+需要 [Node.js](https://nodejs.org/zh-cn/download)（选 LTS）。没装的话，安装程序会提示用 Windows 自带的 winget 自动装好。
 
 1. 到右侧 **Releases** 下载最新的 `履迹-安装包-版本号.zip`。
    （没有 Releases 时：下载这个仓库，绿色按钮 Code → Download ZIP，解压后双击 `打包\打包履迹.cmd`，桌面上会生成安装包。）
@@ -41,10 +41,10 @@
 
 | 目录 | 内容 |
 |---|---|
-| `JobTracker/` | 履迹主程序（单个 HTML 文件）和书签弹窗 `add.html` |
+| `JobTracker/` | 履迹主程序：`index.html` + `app.css` + `js/`（按功能分的 12 个脚本，按顺序加载）和书签弹窗 `add.html` |
 | `helper/` | 本机小服务（Node.js，只监听 127.0.0.1:47321）：读写数据、备份、AI、力扣同步 |
 | `extension/` | 投递自动记录浏览器扩展（Manifest V3），支持 Boss直聘、牛客网 |
-| `Ruye/` | 如页简历编辑器的构建产物，源码见 [ruye-resume](https://github.com/a-xiaoyuan/ruye-resume) |
+| `Ruye/` | 如页简历编辑器（**不在仓库里**）：发布时从 [ruye-resume](https://github.com/a-xiaoyuan/ruye-resume) 源码编译；本地开发运行 `打包/get-ruye.ps1` 获取 |
 | `打包/` | 生成安装包的脚本，以及安装 / 卸载脚本 |
 
 ## 隐私
@@ -61,13 +61,18 @@
 npm test   # 不需要安装任何依赖，Node.js 22+ 自带测试工具
 ```
 
-- `tests/core.test.mjs`：直接从 `JobTracker/index.html` 取出核心函数来测（数据修复、多窗口合并、批量导入解析、AI 返回解析、面试邀请识别、公司查重、链接过滤）。
+```powershell
+powershell -File 打包/get-ruye.ps1          # 从最新 Release 取如页（打安装包前需要）
+powershell -File 打包/get-ruye.ps1 -Build   # 或者从源码编译（要 git、pnpm）
+```
+
+- `tests/core.test.mjs`：直接从 `JobTracker/js/` 里取出核心函数来测（数据修复、多窗口合并、批量导入解析、AI 返回解析、面试邀请识别、公司查重、链接过滤）。
 - `tests/server.test.mjs`：在临时目录和临时端口上启动本机服务，测密钥校验、保存防覆盖、并发保存、路径穿越、收件箱、Agent 开关。不会碰真实数据。
+- `tests/extension.test.mjs`：浏览器扩展后台脚本的去重、失败自检记录、断线后能重记。
 - 每次推送都会在 GitHub Actions 上（Windows 和 Linux）自动跑测试；推送 `v` 开头的标签（如 `v2026.11.26`）会自动打安装包并发布到 Releases。
 
 ## 致谢与许可
 
 - 本项目使用 [MIT 许可证](LICENSE)。
 - `JobTracker/sakuga/`：MIT 许可，见该目录下的 LICENSE。
-- `Ruye/fonts/`：思源黑体 / 思源宋体（Noto Sans SC / Noto Serif SC），SIL Open Font License，见 `Ruye/fonts/OFL.txt`。
-- `Ruye/wasm/`：基于 [Typst](https://github.com/typst/typst)（Apache-2.0）。
+- 如页（安装包里的 `Ruye/`）：字体为思源黑体 / 思源宋体（Noto Sans SC / Noto Serif SC），SIL Open Font License，见 `Ruye/fonts/OFL.txt`；排版引擎基于 [Typst](https://github.com/typst/typst)（Apache-2.0）。

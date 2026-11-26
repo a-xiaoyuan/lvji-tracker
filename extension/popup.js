@@ -1,5 +1,17 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const when = t => new Date(t).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+chrome.storage.local.get(['diagLog'], ({ diagLog = [] }) => {
+  const L = diagLog.filter(d => Date.now() - d.at < 14 * 864e5);
+  if (!L.length) return;
+  $('diagSec').hidden = false;
+  $('diag').innerHTML = L.slice(0, 5).map(d => `<div class="r"><b>${esc(d.site)}</b> · ${esc(d.stage)}<span style="float:right">${when(d.at)}</span><br><span class="t2">${esc(d.why)}</span></div>`).join('');
+  $('diagCopy').onclick = async e => {
+    e.preventDefault();
+    const text = `履迹助手 ${chrome.runtime.getManifest().version} 诊断信息\n` + L.map(d => `${new Date(d.at).toISOString()} | ${d.site} | ${d.stage} | ${d.why} | ${d.url}`).join('\n');
+    try { await navigator.clipboard.writeText(text); $('diagCopy').textContent = '✓ 已复制'; } catch { $('diagCopy').textContent = '复制失败'; }
+  };
+});
 chrome.storage.local.get(['autoApply', 'autoInvite', 'recent'], o => {
   for (const k of ['autoApply', 'autoInvite']) { $(k).checked = o[k] !== false; $(k).onchange = () => chrome.storage.local.set({ [k]: $(k).checked }); }
   const R = o.recent || [];
