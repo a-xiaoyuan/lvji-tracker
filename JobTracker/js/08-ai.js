@@ -103,16 +103,18 @@ function weakCtx(){const R={};for(const a of db.apps){for(const r of a.fail?.rea
 /* ---------- AI 模拟面试官 ---------- */
 let MK=null;
 const MK_KIND=['技术一面：基础 + 项目','技术二面：项目深挖 + 系统设计','HR 面：动机、稳定性、薪资','专练我的薄弱点'];
+const MK_PERSONA=['标准面试官：专业、就事论事，按正常节奏问','压力面：连环追问，会打断，会直接质疑你的答案','严厉型：挑刺为主，指出每个漏洞，很少肯定','温和引导型：循循善诱，答不上来时会给提示','项目深挖型：只盯着项目细节刨根问底，不问八股'];
 const MOCK_A={id:'',company:'AI 模拟面试',role:'',events:[]};
 function openMock(aid){closeModal();const act=db.apps.filter(a=>!['rejected','dropped'].includes(a.status)).sort((x,y)=>y.updatedAt-x.updatedAt);
  MK=null;aiModal('🎙 AI 模拟面试',`<p class="t2" style="margin:0 0 12px">AI 扮演面试官：一次问一题，根据你的回答追问，最后打分并指出薄弱点。答得不好的题会进题库，薄弱点会算进复盘页的统计。</p>
  <div class="fg"><div class="f full"><label>针对哪个岗位（会读它的 JD 和你的简历）</label><select class="inp" id="mkApp"><option value="">通用练习（按我的目标岗位：${esc(aiTarget())}）</option>${act.map(a=>`<option value="${a.id}" ${a.id===aid?'selected':''}>${esc(a.company)} · ${esc(a.role)}</option>`).join('')}</select></div>
  <div class="f"><label>面试类型</label><select class="inp" id="mkKind">${MK_KIND.map((k,i)=>`<option value="${i}">${k}</option>`).join('')}</select></div>
+ <div class="f"><label>面试官风格</label><select class="inp" id="mkPersona">${MK_PERSONA.map((k,i)=>`<option value="${i}">${k}</option>`).join('')}</select></div>
  <div class="f"><label>主问题数量（追问不算）</label><select class="inp" id="mkN">${[3,5,8].map(n=>`<option ${n===5?'selected':''}>${n}</option>`).join('')}</select></div></div>
  ${aiSlow()?'<p class="t2">现在用的是命令行工具，每轮要等 20～60 秒；DeepSeek 充值后会快很多。</p>':''}
  <div class="mfoot"><button class="btn" data-act="mclose">取消</button><button class="btn primary" data-act="mkstart">开始面试</button></div>`,'mock');}
 function mkSystem(){const a=MK.aid?appById(MK.aid):null,r=resumeCtx(a),w=weakCtx(),kind=MK_KIND[MK.kind];
- return `你是一位严格但友善的中文面试官，正在进行「${kind}」。候选人应聘：${a?`${a.company} 的 ${a.role}`:aiTarget()}。
+ return `你是一位严格但友善的中文面试官，正在进行「${kind}」。${MK.persona?`你的面试风格是「${MK_PERSONA[MK.persona].split('：')[0]}」：${MK_PERSONA[MK.persona].split('：')[1]}，请全程保持这个风格。`:''}候选人应聘：${a?`${a.company} 的 ${a.role}`:aiTarget()}。
 ${a?'【岗位信息】\n'+appCtx(a)+'\n':''}${r?`【候选人简历（${r.title}）】\n${r.text}\n`:'（没有简历内容，就按岗位常见要求出题）\n'}${w?`【候选人以往的薄弱点】${w}\n`:''}
 规则：
 1. 一次只问一个问题。问题要具体，优先结合简历里的真实项目和岗位要求${MK.kind==3?'，重点考察上面列出的薄弱点':''}${MK.kind==2?'；HR 面问求职动机、离职原因、职业规划、优缺点、薪资期望、抗压等':''}。
@@ -123,8 +125,8 @@ async function mkCall(userMsg){const tk=AIREQ;MK.busy=true;MK.msgs.push({role:'u
  try{const j=await ai({system:mkSystem(),messages:MK.msgs,json:true,max:900,temperature:.6});if(!MK||tk!==AIREQ)return;
   MK.msgs.push({role:'assistant',content:JSON.stringify(j)});MK.busy=false;MK.err='';return j;}
  catch(e){if(!MK||tk!==AIREQ)return;MK.msgs.pop();MK.busy=false;MK.err=e.message;renderMock();return null;}}
-async function mkStart(){const aid=document.getElementById('mkApp').value,kind=+document.getElementById('mkKind').value,n=+document.getElementById('mkN').value;
- MK={aid,kind,n,msgs:[],qa:[],cur:null,main:0,busy:false,err:'',last:''};
+async function mkStart(){const aid=document.getElementById('mkApp').value,kind=+document.getElementById('mkKind').value,persona=+document.getElementById('mkPersona').value,n=+document.getElementById('mkN').value;
+ MK={aid,kind,persona,n,msgs:[],qa:[],cur:null,main:0,busy:false,err:'',last:''};
  const j=await mkCall('面试开始，请问第一个问题。（已问主问题 0/'+n+'）');if(!j)return;
  MK.cur={q:j.question||'请先做个简单的自我介绍。',topic:j.topic||'',follow:false};MK.main=1;renderMock();}
 async function mkAnswer(skip){if(!MK||MK.busy||!MK.cur)return;const el=document.getElementById('mkA');const ans=skip?'（这题我不会，跳过）':(el?.value||'').trim();
@@ -139,9 +141,9 @@ async function mkFinish(){if(!MK)return;mkStopVoice();if(!MK.qa.length){closeMod
  try{const j=await ai({system:'你是资深面试评估官，根据面试记录给出客观、具体、可执行的评估。用中文。',prompt:`这是一场「${MK_KIND[MK.kind]}」的模拟面试，候选人应聘${a?a.company+' 的 '+a.role:aiTarget()}。\n\n${tx}\n\n只输出一个 JSON：{"score":0～100 的总分,"verdict":"建议通过"或"待定"或"不建议通过","summary":"2～3 句总体评价","strengths":["做得好的点"],"weak":["从这些标签里选最相关的 0～3 个：${WEAK_RS.join('、')}"],"advice":["3～5 条具体改进建议"],"better":[{"q":"答得不好的题","tip":"这题更好的回答思路，2～3 句"}]}`,json:true,max:1800,temperature:.3});
   if(!MK||tk!==AIREQ)return;MK.busy=false;MK.report=Object.assign({score:0,verdict:'',summary:'',strengths:[],weak:[],advice:[],better:[]},j);MK.report.weak=(MK.report.weak||[]).filter(w=>WEAK_RS.includes(w));mkSave();renderMock();skHit(innerWidth/2,innerHeight/2-80,MK.report.score>=75?'don':'pon',MK.report.score>=75);}
  catch(e){if(!MK||tk!==AIREQ)return;MK.busy=false;MK.err=e.message;renderMock();}}
-function mkSave(){const R=MK.report,a=MK.aid?appById(MK.aid):null,m={id:uid(),at:nowLocal(),aid:MK.aid||'',kind:MK_KIND[MK.kind],qa:MK.qa,report:R};db.mocks.push(m);MK.saved=m.id;
+function mkSave(){const R=MK.report,a=MK.aid?appById(MK.aid):null,m={id:uid(),at:nowLocal(),aid:MK.aid||'',kind:MK_KIND[MK.kind],persona:MK_PERSONA[MK.persona||0],qa:MK.qa,report:R};db.mocks.push(m);MK.saved=m.id;
  const badQ=MK.qa.filter(x=>x.score&&x.score<=3).map(x=>x.q.replace(/\s*\n\s*/g,' '));
- if(a){a.events.push({id:uid(),type:'note',title:'AI 模拟面试 · '+MK_KIND[MK.kind].split('：')[0],at:'',done:true,rating:Math.max(1,Math.round((+R.score||0)/20)),questions:badQ.join('\n'),review:[R.summary,...(R.advice||[]).map(x=>'· '+x)].filter(Boolean).join('\n'),weak:R.weak,place:'',mock:m.id});touch(a);}
+ if(a){a.events.push({id:uid(),type:'note',title:'AI 模拟面试 · '+MK_KIND[MK.kind].split('：')[0]+(MK.persona?' · '+MK_PERSONA[MK.persona].split('：')[0]:''),at:'',done:true,rating:Math.max(1,Math.round((+R.score||0)/20)),questions:badQ.join('\n'),review:[R.summary,...(R.advice||[]).map(x=>'· '+x)].filter(Boolean).join('\n'),weak:R.weak,place:'',mock:m.id});touch(a);}
  else{m.badQ=badQ;persist();}}
 function mkReportHtml(R,qa){return `<div class="mkrep"><div class="mkscore"><b>${+R.score||0}</b><span>/ 100</span><em>${esc(R.verdict||'')}</em></div><p>${fmtAI(R.summary||'')}</p>
  ${R.strengths?.length?`<h4 class="mdh">做得好的</h4><ul>${R.strengths.map(x=>`<li>${fmtAI(x)}</li>`).join('')}</ul>`:''}
@@ -150,7 +152,7 @@ function mkReportHtml(R,qa){return `<div class="mkrep"><div class="mkscore"><b>$
  ${R.weak?.length?`<div class="quick" style="margin-top:10px">${R.weak.map(w=>`<span class="tag">薄弱点 · ${esc(w)}</span>`).join('')}</div>`:''}
  <details class="mklog"><summary>查看完整问答（${qa.length} 题）</summary>${qa.map(x=>`<div class="mkqa"><div class="t1">${x.follow?'↳ 追问：':''}${fmtAI(x.q)}</div><div class="mkans">${esc(x.a)}</div><div class="t2">${'★'.repeat(x.score)}${'☆'.repeat(5-x.score)} ${fmtAI(x.comment)}</div></div>`).join('')}</details></div>`;}
 function renderMock(){if(!MK)return;const b=document.getElementById('aiBody');if(!b)return;const a=MK.aid?appById(MK.aid):null;
- const head=`<div class="mkhead"><span class="tag">${esc(a?a.company:'通用练习')}</span><span class="tag">${esc(MK_KIND[MK.kind].split('：')[0])}</span>${MK.cur||MK.busy&&!MK.report?`<span class="t2">第 ${Math.max(1,MK.main)} / ${MK.n} 题</span>`:''}</div>`;
+ const head=`<div class="mkhead"><span class="tag">${esc(a?a.company:'通用练习')}</span><span class="tag">${esc(MK_KIND[MK.kind].split('：')[0])}</span>${MK.persona?`<span class="tag">${esc(MK_PERSONA[MK.persona].split('：')[0])}</span>`:''}${MK.cur||MK.busy&&!MK.report?`<span class="t2">第 ${Math.max(1,MK.main)} / ${MK.n} 题</span>`:''}</div>`;
  const last=MK.qa.at(-1);
  if(MK.report){b.innerHTML=head+mkReportHtml(MK.report,MK.qa)+aiWho()+`<div class="mfoot"><button class="btn" data-act="mkagain">再练一次</button><button class="btn primary" data-act="mclose">完成</button></div>`;return;}
  if(!MK.cur&&!MK.qa.length&&MK.err){b.innerHTML=head+aiErr({message:MK.err},'mkretrystart');return;}
