@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>加到履迹</title>
+<link rel="icon" href="avatar.png">
+<style>
+:root{--bg:#f4f5f9;--panel:#fff;--line:#e5e7ef;--text:#1d2433;--muted:#6b7385;--soft:#f0f2f7;--accent:#4f46e5;--accent-soft:#eef0ff;--ok:#10a37f;--warn:#e8930c}
+@media (prefers-color-scheme:dark){:root{--bg:#12141a;--panel:#1a1d25;--line:#2a2e3a;--text:#e6e8ef;--muted:#9097a8;--soft:#22252f;--accent:#8b85ff;--accent-soft:#25243f}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:14px/1.55 "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;padding:18px}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:radial-gradient(50% 40% at 10% 0%,rgba(124,115,245,.18),transparent 70%),radial-gradient(40% 35% at 100% 10%,rgba(6,182,212,.12),transparent 70%)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:0 10px 40px rgba(20,25,45,.08);animation:up .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes up{from{opacity:0;transform:translateY(12px)}}
+.hd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.hd img{width:34px;height:34px;border-radius:10px;object-fit:cover}
+.hd b{font-size:16px}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+.f.full{grid-column:1/-1}
+input,select,textarea{width:100%;font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:7px 10px;outline:none}
+input[type=checkbox]{width:auto;margin:3px 0 0}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{resize:vertical;min-height:90px;font-size:13px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:7px;cursor:pointer;font:inherit;color:var(--muted)}
+.seg button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.btn{width:100%;margin-top:14px;padding:10px;border:0;border-radius:10px;background:linear-gradient(135deg,#7c73ff,#4f46e5);color:#fff;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(79,70,229,.35)}
+.btn:disabled{opacity:.6;cursor:default}
+.link{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
+.warn{background:rgba(232,147,12,.12);color:#a8650a;border-radius:9px;padding:7px 10px;font-size:12.5px;margin-bottom:12px;display:none}
+.info{background:var(--accent-soft);color:var(--accent);border-radius:9px;padding:7px 10px;font-size:12.5px;margin-bottom:12px}
+.t2{color:var(--muted);font-size:12px}
+.done{text-align:center;padding:40px 10px}
+.done .ic{width:64px;height:64px;border-radius:50%;background:var(--ok);color:#fff;font-size:34px;display:grid;place-items:center;margin:0 auto 12px;animation:pop .45s cubic-bezier(.2,.9,.3,1.5)}
+@keyframes pop{from{transform:scale(.3)}}
+details summary{cursor:pointer;color:var(--muted);font-size:12.5px;margin:4px 0}
+.list{max-height:430px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.it{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+.it:last-child{border-bottom:0}.it.have{opacity:.5}
+.it b{font-weight:600}
+.bar{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px}
+</style>
+</head>
+<body>
+<div class="card" id="box"></div>
+<script>
+const CH=['Boss直聘','内推','官网','拉勾','猎聘','牛客','校招','猎头','其他'];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let d={};try{d=JSON.parse(decodeURIComponent((location.hash.match(/d=(.*)$/)||[])[1]||'{}'));}catch{}
+let mode=d.mode||'job',status=d.st||'applied';
+const head=(t,s)=>`<div class="hd"><img src="avatar.png" alt=""><div><b>${t}</b><div class="t2">${s}</div></div></div>${d.v?'':'<div class="info">收藏夹里的「加到履迹」是旧版本。到履迹的「新增投递 → 浏览器一键添加」重新拖一次，就能收 Boss 聊天和整页岗位了。</div>'}`;
+// 同一浏览器里打开过履迹时，用本机存的记录查重
+let mine=[];try{mine=JSON.parse(localStorage.getItem('jobtracker_v1')||'{}').apps||[];}catch{}
+const ck=s=>String(s||'').trim().toLowerCase().replace(/(股份)?有限公司|集团|科技|（.*?）|\(.*?\)/g,'');
+const same=(x,y)=>{const a=ck(x),b=ck(y);return !!a&&!!b&&(a===b||a.includes(b)||b.includes(a));};
+const findMine=(co,role)=>mine.find(a=>same(a.company,co)&&(!role||!a.role||ck(a.role)===ck(role)));
+async function post(item){const r=await fetch('/api/inbox',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(item)});if(!r.ok)throw new Error(r.status===429?'收件箱满了，先打开一次履迹':'HTTP '+r.status);}
+function finish(title,sub){$('box').innerHTML=`<div class="done"><div class="ic">✓</div><b style="font-size:17px">${title}</b><div class="t2" style="margin-top:6px">${sub}</div><div class="t2" style="margin-top:14px">履迹开着的话几秒内就会出现；没开的话下次打开时自动收进去。</div></div>`;setTimeout(()=>window.close(),1800);}
+
+/* ---------- 单个岗位 ---------- */
+function renderJob(){
+ const dup=findMine(d.company,d.role),co=!dup&&mine.filter(a=>same(a.company,d.company));
+ $('box').innerHTML=head('加到履迹','信息已自动识别，确认一下，按回车保存')+
+ `<div class="warn" id="warn" style="${dup?'display:block':''}">${dup?`已经记录过「${esc(dup.company)}${dup.role?' · '+esc(dup.role):''}」${dup.appliedAt?'（'+esc(dup.appliedAt)+' 投递）':''}。保存会更新那一条（补上链接、JD，收藏的会改成已投递），不会重复添加。`:''}</div>
+ ${co&&co.length?`<div class="info">你在这家公司还记录过：${co.slice(0,3).map(a=>esc(a.role||'未填岗位')).join('、')}。这次是新岗位，会单独记一条。</div>`:''}
+ <div class="g">
+  <div class="f"><label>公司</label><input id="company"></div>
+  <div class="f"><label>岗位</label><input id="role"></div>
+  <div class="f"><label>城市</label><input id="city"></div>
+  <div class="f"><label>薪资</label><input id="salary"></div>
+  <div class="f"><label>渠道</label><select id="channel">${CH.map(c=>`<option>${c}</option>`).join('')}</select></div>
+  <div class="f"><label>状态</label><div class="seg"><button type="button" data-st="applied">已投递 / 已沟通</button><button type="button" data-st="wish">先收藏</button></div></div>
+  ${d.st?`<div class="f full t2">${d.st==='applied'?'页面上是「继续沟通」，说明你已经和这家聊过了，默认记为已投递。':'页面上是「立即沟通」，你还没和这家聊过，默认先收藏。'}</div>`:''}
+  <div class="f"><label>HR / 联系人</label><input id="hr"></div><div></div>
+  <div class="f full"><details><summary>岗位描述（JD）· <span id="jdn"></span></summary><textarea id="jd" rows="6"></textarea></details></div>
+  <div class="f full t2" style="word-break:break-all">${d.link?'🔗 '+esc(d.link):''}</div>
+ </div>
+ <button class="btn" id="save">保存到履迹 ↵</button>
+ ${d.jobs?.length>=2?`<div style="text-align:center;margin-top:10px"><button class="link" id="toList">这一页还有 ${d.jobs.length} 个岗位，一起收藏 →</button></div>`:''}`;
+ for(const k of ['company','role','city','salary','hr'])$(k).value=(d[k]||'').trim();
+ $('channel').value=CH.includes(d.channel)?d.channel:'官网';
+ $('jd').value=d.jd||'';$('jdn').textContent=d.jd?`已抓取 ${d.jd.length} 字，会存进备注并自动分析技能匹配`:'没有抓到，可以手动粘贴';
+ const seg=()=>document.querySelectorAll('[data-st]').forEach(x=>x.classList.toggle('on',x.dataset.st===status));seg();
+ document.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{status=b.dataset.st;seg();});
+ $('save').onclick=saveJob;if($('toList'))$('toList').onclick=()=>{mode='list';render();};
+ ($('company').value?$('role').value?$('save'):$('role'):$('company')).focus();}
+async function saveJob(){
+ const item={company:$('company').value.trim(),role:$('role').value.trim(),city:$('city').value.trim(),salary:$('salary').value.trim(),channel:$('channel').value,link:d.link||'',jd:$('jd').value,hr:$('hr').value.trim(),status,kind:'job'};
+ if(!item.company){$('company').focus();$('company').style.borderColor='#e5484d';return;}
+ $('save').disabled=true;$('save').textContent='保存中…';
+ try{await post(item);finish('已加到履迹',esc(item.company)+(item.role?' · '+esc(item.role):''));}
+ catch(e){$('save').disabled=false;$('save').textContent='保存失败（'+e.message+'），点这里重试';}}
+
+/* ---------- 整页岗位 ---------- */
+function renderList(){const J=d.jobs||[];
+ $('box').innerHTML=head(`收藏这一页的岗位`,`识别到 ${J.length} 个，勾选要收进「待投递」的`)+
+ `<div class="bar"><label class="t2"><input type="checkbox" id="all"> 全选（已记录过的除外）</label>${d.mode==='job'?'<button class="link" id="back">← 只收当前这个</button>':''}</div>
+ <div class="list">${J.map((x,i)=>{const h=findMine(x.company,x.role);return `<label class="it ${h?'have':''}"><input type="checkbox" data-i="${i}" ${h?'disabled':''}><div><b>${esc(x.company)} · ${esc(x.role)}</b>${h?' <span class="t2">已记录</span>':''}<div class="t2">${[x.city,x.salary].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}</div></div></label>`;}).join('')}</div>
+ <div class="t2" style="margin-top:8px">列表页拿不到 JD，收进去以后打开链接再补就行。薪资如果显示成乱码，是网站做了字体加密，会自动留空。</div>
+ <button class="btn" id="saveL">收进待投递</button>`;
+ $('all').onchange=e=>document.querySelectorAll('[data-i]:not(:disabled)').forEach(c=>c.checked=e.target.checked);
+ if($('back'))$('back').onclick=()=>{mode='job';render();};
+ $('saveL').onclick=async()=>{const S=[...document.querySelectorAll('[data-i]:checked')].map(c=>J[+c.dataset.i]);if(!S.length)return;
+  $('saveL').disabled=true;let n=0;
+  try{for(const x of S){$('saveL').textContent=`保存中… ${n}/${S.length}`;await post({...x,channel:d.channel,status:'wish',kind:'job',jd:''});n++;}finish(`已收藏 ${n} 个岗位`,S.slice(0,4).map(x=>esc(x.company)).join('、')+(S.length>4?' 等':''));}
+  catch(e){$('saveL').disabled=false;$('saveL').textContent=`已存 ${n} 个，剩下的保存失败（${e.message}），点这里重试`;S.splice(0,n);}};}
+
+/* ---------- Boss 聊天 ---------- */
+function renderChat(){const m=findMine(d.company,'');
+ $('box').innerHTML=head('收下这段聊天','履迹会自动判断：是面试邀请就用 AI 帮你建日程，其他内容存进这家公司的备注')+
+ `<div class="g"><div class="f"><label>公司</label><input id="company"></div><div class="f"><label>HR</label><input id="hr"></div>
+ <div class="f full"><label>岗位</label><input id="role"></div>
+ <div class="f full"><label>聊天内容（可以删掉无关的部分；先在网页上选中一段再点按钮，就只收选中的）</label><textarea id="text" rows="11"></textarea></div></div>
+ ${m?`<div class="t2" style="margin-top:6px">会关联到你记录过的「${esc(m.company)} · ${esc(m.role||'')}」</div>`:'<div class="t2" style="margin-top:6px">履迹里还没有这家公司的记录，收进去时会帮你新建一条。</div>'}
+ <button class="btn" id="saveC">交给履迹</button>`;
+ for(const k of ['company','hr','role','text'])$(k).value=(d[k]||'').trim();
+ $('saveC').onclick=async()=>{const item={kind:'chat',company:$('company').value.trim(),hr:$('hr').value.trim(),role:$('role').value.trim(),text:$('text').value.trim(),channel:'Boss直聘',link:''};
+  if(item.text.length<4)return $('text').focus();$('saveC').disabled=true;
+  try{await post(item);finish('已交给履迹',esc(item.company||'这段聊天'));}catch(e){$('saveC').disabled=false;$('saveC').textContent='保存失败（'+e.message+'），点这里重试';}};}
+
+function render(){mode==='chat'?renderChat():mode==='list'&&d.jobs?.length?renderList():renderJob();}
+render();
+addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA'&&mode==='job'){e.preventDefault();saveJob();}if(e.key==='Escape')window.close();});
+</script>
+</body>
+</html>

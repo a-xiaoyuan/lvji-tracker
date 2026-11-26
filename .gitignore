@@ -1,0 +1,12 @@
+# 密钥和本机文件：永远不要提交
+helper/token.txt
+helper/deepseek-key.txt
+helper/agent-usage.json
+helper/migrated.txt
+helper/launch.vbs
+*.log
+*.bak
+*.tmp
+node_modules/
+_旧版本/
+履迹-安装包-*.zip

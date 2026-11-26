@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+body{margin:0;width:300px;font:13px/1.55 "Microsoft YaHei UI",system-ui,sans-serif;color:#16161d;background:#fff}
+.hd{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:2px solid #16161d}
+.hd img{width:28px;height:28px;border-radius:8px}.hd b{font-size:14px}
+.sec{padding:10px 14px;border-bottom:1px solid #eee}
+.st{display:flex;align-items:center;gap:6px;margin:2px 0}.dot{width:8px;height:8px;border-radius:50%;background:#bbb}.dot.ok{background:#10a37f}.dot.bad{background:#ef4444}
+label{display:flex;align-items:flex-start;gap:8px;margin:6px 0;cursor:pointer}input{margin-top:3px}
+.t2{color:#6b7385;font-size:12px}
+.r{padding:5px 0;border-bottom:1px dashed #eee;font-size:12px}.r:last-child{border:0}
+a{color:#ff2d87}
+</style>
+</head>
+<body>
+<div class="hd"><img src="icon.png" alt=""><div><b>履迹助手</b><div class="t2">Boss直聘 自动记录</div></div></div>
+<div class="sec" id="st"><div class="t2">检查连接…</div></div>
+<div class="sec">
+ <label><input type="checkbox" id="autoApply"><span>点「立即沟通」时自动记到履迹<br><span class="t2">记为「已投递」，已收藏过的会改成已投递</span></span></label>
+ <label><input type="checkbox" id="autoInvite"><span>聊天里出现面试邀请时交给履迹<br><span class="t2">履迹会用 AI 识别时间、轮次和会议号，你确认后建日程</span></span></label>
+</div>
+<div class="sec"><div class="t2" style="margin-bottom:4px">最近记录</div><div id="rec" class="t2">还没有</div></div>
+<script src="popup.js"></script>
+</body>
+</html>
