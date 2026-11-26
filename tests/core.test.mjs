@@ -158,3 +158,12 @@ test('classifyNotice：相对日期（明天）也能算', () => {
   assert.equal(c.kind, 'interview');
   assert.equal(c.at, '2026-11-27T10:00');
 });
+
+/* ---------- 订阅自动扫描 ---------- */
+const DS = load(['dueSubs']);
+test('dueSubs：没扫过和超过 24 小时的算到期', () => {
+  const now = 1764244800000;
+  const subs = [{ id: 'a', lastRun: 0 }, { id: 'b', lastRun: now - 25 * 3600e3 }, { id: 'c', lastRun: now - 3600e3 }];
+  assert.equal(DS.dueSubs(subs, now).map(x => x.id).join(','), 'a,b');
+  assert.equal(DS.dueSubs([], now).length, 0);
+});

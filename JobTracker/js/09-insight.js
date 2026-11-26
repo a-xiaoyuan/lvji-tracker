@@ -121,6 +121,9 @@ function newJobs(list,seen,apps){const sk=new Set(seen||[]),tk=new Set((apps||[]
 function huntSaveSub(){const g=id=>document.getElementById(id)?.value.trim()||'';const q={role:g('huR'),city:g('huC'),type:g('huT'),salary:g('huS'),extra:g('huX')};
 if(!q.role)return toast('先填目标岗位');db.subs.push({id:uid(),...q,lastRun:0,seen:[]});save();closeModal();render();toast('已存为岗位订阅，去概览页点「扫描新岗位」就能只看新增');}
 function subScan(id){const s2=db.subs.find(x=>x.id===id);if(!s2)return;huntRun({role:s2.role,city:s2.city,type:s2.type,salary:s2.salary,extra:s2.extra},id);}
+function dueSubs(subs,now){return (subs||[]).filter(s2=>!s2.lastRun||now-s2.lastRun>864e5);}
+function autoScanSubs(){let ok=false;try{ok=!!localStorage.getItem('lvji_hunt_ok');}catch(_){}
+ if(!ok||HUNT_RUN.on)return;const due=dueSubs(db.subs,Date.now());if(due.length)subScan(due[0].id);}
 async function huntGo(){if(HUNT_RUN.on)return;const g=id=>document.getElementById(id)?.value.trim()||'',q={role:g('huR'),city:g('huC'),type:g('huT'),salary:g('huS'),extra:g('huX')};
 if(!q.role)return toast('先填目标岗位');huntRun(q,'');}
 async function huntRun(q,subId){if(HUNT_RUN.on)return;HUNT_RUN.on=true;closeModal();toast(subId?'开始扫描订阅的新岗位，大概 2～4 分钟，好了会提醒你':'开始联网找岗位，大概 2～4 分钟，好了会提醒你',null,5000);
@@ -128,6 +131,7 @@ async function huntRun(q,subId){if(HUNT_RUN.on)return;HUNT_RUN.on=true;closeModa
  try{const j=await ai({web:true,system:'你是求职调研助手。必须用网络搜索查找真实、目前仍在招聘的岗位，只列查得到来源链接的岗位，绝不编造公司、岗位或链接。中文。',prompt:`帮我找 8～12 个合适的岗位。\n目标岗位：${q.role}\n城市：${q.city||'不限'}\n类型：${q.type}\n期望薪资：${q.salary||'不限'}\n其他要求：${q.extra||'无'}\n我的技能：${db.skills.map(s=>s.name).join('、')||'未填'}\n已经在跟进的（不要重复）：${have||'无'}\n今天是 ${today()}，优先找最近一个月发布或仍开放的。\n\n只输出 JSON：{"jobs":[{"company":"公司","role":"岗位名称","city":"城市","salary":"薪资（查不到留空）","link":"岗位或招聘页链接","channel":"来源网站","deadline":"网申截止日期 YYYY-MM-DD，没有留空","why":"为什么适合我，一句话","jd":"岗位要求摘要，2～4 句"}]}`,json:true,max:5000});
   let jobs=(j.jobs||[]).filter(x=>x&&x.company&&x.role&&!(/^\d{4}-\d\d-\d\d$/.test(x.deadline||"")&&x.deadline<today())).slice(0,15);
 if(subId){const s2=db.subs.find(x=>x.id===subId);if(s2){jobs=jobs.map(x=>({...x,...scoreJob(x,db.skills,(db.settings.profile||{}).target)}));const fresh=newJobs(jobs,s2.seen,db.apps);s2.seen=[...new Set([...(s2.seen||[]),...jobs.map(jobKey)])];s2.lastRun=Date.now();save();jobs=fresh.sort((a,b)=>(b.score||0)-(a.score||0));}}
+try{localStorage.setItem('lvji_hunt_ok','1');}catch(_){}
 HUNT={q,at:nowLocal(),jobs,engine:AIL.engine,sub:subId||''};toast(subId?`订阅扫描完：${HUNT.jobs.length} 个新岗位`:`找到 ${HUNT.jobs.length} 个岗位`,['查看',()=>huntShow()],15000);}
  catch(e){toast('😵 找岗位失败：'+e.message,null,8000);}finally{HUNT_RUN.on=false;}}
 function huntShow(){if(!HUNT)return openHunt();closeModal();const has=x=>db.apps.some(a=>sameCo(a.company,x.company)&&coKey(a.role)===coKey(x.role));
