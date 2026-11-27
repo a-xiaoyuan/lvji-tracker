@@ -106,7 +106,8 @@ function drawPoster(S){const cv=document.getElementById('posterCv');if(!cv)retur
  lines.forEach((t,i)=>g.fillText(t.slice(0,25),56,780+i*48));
  g.fillStyle='#8f89ad';g.font=F(400,24);g.fillText(`履迹 · ${today()}`,56,1024);}
 /* ---------------- 数据四件套：话术效果 / 人脉雷达 / 时机洞察 / 海投疲劳 ---------------- */
-function appReplied(a){return !['wish','applied','rejected'].includes(a.status)||(a.events||[]).some(e=>e.type==='interview'||e.type==='test'||e.done);}
+function appReplied(a){if(!a||a.status==='wish')return false;if(a.status==='rejected')return !((a.fail&&a.fail.reasons)||[]).includes('没回音');
+ return a.status!=='applied'||(a.events||[]).some(e=>e&&e.type!=='note'&&e.type!=='followup');}
 function tplStats(apps,tpls){const M={};for(const a of apps||[])for(const u of a.tplUse||[]){const r=M[u.tpl]=M[u.tpl]||{used:0,replied:0};r.used++;if(appReplied(a))r.replied++;}
  return (tpls||[]).map(t=>({id:t.id,title:t.title,...(M[t.id]||{used:0,replied:0})})).filter(x=>x.used>0).sort((a,b)=>b.used-a.used);}
 function tplStatsCard(){const S=tplStats(db.apps,db.tpls);if(!S.length)return '';

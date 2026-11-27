@@ -264,3 +264,13 @@ test('话术效果、人脉雷达、时机洞察、海投疲劳', () => {
   tired[0].status = 'interview';
   assert.equal(F.fatigueTip(tired), '');
 });
+
+test('appReplied：自己写的笔记、跟进、模拟面试不算对方回复', () => {
+  const F = load(['appReplied']);
+  assert.equal(F.appReplied({ status: 'applied', events: [{ type: 'note', done: true, title: 'AI 模拟面试' }] }), false);
+  assert.equal(F.appReplied({ status: 'applied', events: [{ type: 'followup', done: true }] }), false);
+  assert.equal(F.appReplied({ status: 'applied', events: [{ type: 'test', at: '2026-11-27T10:00' }] }), true);
+  assert.equal(F.appReplied({ status: 'rejected', fail: { reasons: ['没回音'] }, events: [] }), false);
+  assert.equal(F.appReplied({ status: 'rejected', fail: { reasons: ['算法题'] }, events: [] }), true);
+  assert.equal(F.appReplied({ status: 'wish', events: [{ type: 'interview' }] }), false);
+});
