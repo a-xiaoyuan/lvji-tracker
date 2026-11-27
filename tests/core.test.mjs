@@ -110,3 +110,19 @@ test('dayDiff：按日期算相差几天', () => {
   assert.equal(F.dayDiff('2026-12-01', '2026-11-26'), 5);
   assert.equal(F.dayDiff('2026-11-26', '2026-11-26'), 0);
 });
+
+/* ---------- 模拟弱项 → 题库专项 ---------- */
+const WQ = load(['weakCounts', 'weakQuestions']);
+test('weakCounts：统计复盘和模拟里反复出现的弱项', () => {
+  const evs = [{ weak: ['项目深挖', '算法题'] }, { weak: ['项目深挖'] }, { weak: [] }, {}, { weak: ['算法题', '表达沟通'] }];
+  const r = WQ.weakCounts(evs);
+  assert.equal(r[0].tag, '项目深挖');
+  assert.equal(r[0].n, 2);
+  assert.equal(r[1].tag, '算法题');
+  assert.equal(WQ.weakCounts([]).length, 0);
+});
+test('weakQuestions：只留下出自弱项场次的题目', () => {
+  const Q = [{ h: '1', e: { weak: ['项目深挖'] } }, { h: '2', e: { weak: ['算法题'] } }, { h: '3', e: {} }];
+  assert.equal(WQ.weakQuestions(Q, ['项目深挖']).map(x => x.h).join(','), '1');
+  assert.equal(WQ.weakQuestions(Q, []).length, 0);
+});
