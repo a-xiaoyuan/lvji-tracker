@@ -7,6 +7,7 @@ import { load } from './extract.mjs';
 const F = load(['ST', 'DEF_HABITS', 'DEF_TPL', 'pad', 'dstr', 'today', 'dayDiff', 'uid', 'newApp', 'normalize', 'mergeDb',
   'CITY', 'CH_ALIAS', 'parseLine', 'aiJSON', 'looksInvite', 'coKey', 'sameCo', 'safeUrl', 'esc']);
 const plain = x => JSON.parse(JSON.stringify(x)); // vm 里的对象换成本环境的，deepEqual 才比得上
+const QF = load(['dayDiff', 'waitFor', 'buildTodayQueue']);
 
 test('normalize：空数据也能得到完整结构', () => {
   const d = F.normalize(null);
@@ -150,4 +151,88 @@ test('海报数据和吉祥物阶段', () => {
   assert.equal(F.mascotStage([{ status: 'applied', events: [] }]).e, '🏃');
   assert.equal(F.mascotStage([{ status: 'wish', events: [] }]).e, '🌱');
   assert.equal(F.mascotStage([{ status: 'applied', events: [{ type: 'interview', done: false }] }]).e, '👔');
+});
+
+/* ---------- 今日行动队列 buildTodayQueue ---------- */
+// 固定今天 2026-11-26、明天 2026-11-27；假公司名，不用真实数据
+const TD = '2026-11-26', TM = '2026-11-27';
+// 渠道回复统计：官网 med 3 / p80 4 → 门槛 6 天；全部渠道 med 5 / p80 7 → 门槛 9 天（waitFor 的算法）
+const RS = { _all: { n: 5, med: 5, p80: 7 }, '官网': { n: 4, med: 3, p80: 4 } };
+const mkApp = p => Object.assign({ id: 'x', company: '甲公司', role: '后端开发', channel: 'Boss直聘', status: 'applied', appliedAt: '', due: '', snooze: '', events: [], offer: {} }, p);
+const kinds = Q => plain(Q).map(x => x.kind);
+
+test('buildTodayQueue：截止临近的待投递进队列，远的和已结束的不进', () => {
+  const Q = QF.buildTodayQueue([
+    mkApp({ id: 'a1', status: 'wish', due: '2026-11-26' }),
+    mkApp({ id: 'a2', status: 'wish', due: '2026-11-29' }),
+    mkApp({ id: 'a3', status: 'wish', due: '2026-11-30' }),
+    mkApp({ id: 'a4', status: 'wish', due: '2026-11-25' }),
+    mkApp({ id: 'a5', status: 'rejected', due: '2026-11-26' }),
+    mkApp({ id: 'a6', status: 'applied', due: '2026-11-26', appliedAt: '2026-11-25' }),
+  ], TD, TM, RS, 0);
+  assert.deepEqual(plain(Q).map(x => x.app), ['a4', 'a1', 'a2'], '已过期的最靠前，其次今天、3 天内；4 天后和已结束的不进');
+  assert.ok(Q.every(x => x.kind === 'due' && x.what === 'wish'));
+});
+
+test('buildTodayQueue：Offer 截止答复也算截止事项', () => {
+  const Q = QF.buildTodayQueue([
+    mkApp({ id: 'o1', status: 'offer', offer: { deadline: '2026-11-28' } }),
+    mkApp({ id: 'o2', status: 'offer', offer: { deadline: '2026-12-05' } }),
+    mkApp({ id: 'o3', status: 'offer', offer: { deadline: '2026-11-25' } }),
+  ], TD, TM, RS, 0);
+  assert.deepEqual(plain(Q).map(x => x.app), ['o1']);
+  assert.equal(Q[0].what, 'offer'); assert.equal(Q[0].days, 2);
+});
+
+test('buildTodayQueue：明天的面试进队列，今天的、后天的、已完成的、笔试不进', () => {
+  const ev = (id, type, at, done) => ({ id, type, at, done: !!done, title: '技术面' });
+  const Q = QF.buildTodayQueue([
+    mkApp({ id: 'i1', status: 'interview', events: [ev('e1', 'interview', '2026-11-27T10:00')] }),
+    mkApp({ id: 'i2', status: 'interview', events: [ev('e2', 'interview', '2026-11-26T10:00')] }),
+    mkApp({ id: 'i3', status: 'interview', events: [ev('e3', 'interview', '2026-11-28T10:00')] }),
+    mkApp({ id: 'i4', status: 'interview', events: [ev('e4', 'interview', '2026-11-27T14:00', true)] }),
+    mkApp({ id: 'i5', status: 'test', events: [ev('e5', 'test', '2026-11-27T09:00')] }),
+  ], TD, TM, RS, 0);
+  assert.deepEqual(plain(Q).map(x => x.app), ['i1']);
+  assert.equal(Q[0].kind, 'prep'); assert.equal(Q[0].event, 'e1');
+});
+
+test('buildTodayQueue：没动静按本渠道的回复门槛判断，别的渠道用整体门槛', () => {
+  const Q = QF.buildTodayQueue([
+    mkApp({ id: 's1', channel: '官网', appliedAt: '2026-11-20' }), // 等了 6 天 = 官网门槛，进
+    mkApp({ id: 's2', channel: '官网', appliedAt: '2026-11-21' }), // 等了 5 天 < 门槛，不进
+    mkApp({ id: 's3', channel: 'Boss直聘', appliedAt: '2026-11-17' }), // 等了 9 天 = 整体门槛，进
+    mkApp({ id: 's4', channel: 'Boss直聘', appliedAt: '2026-11-18' }), // 等了 8 天 < 门槛，不进
+  ], TD, TM, RS, 0);
+  assert.deepEqual(plain(Q).map(x => x.app), ['s3', 's1'], '等得久的排前面');
+  const s1 = Q.find(x => x.app === 's1');
+  assert.equal(s1.wait, 6); assert.equal(s1.med, 3); assert.equal(s1.days, 6);
+});
+
+test('buildTodayQueue：推迟提醒的、投递后有过动静的、不是已投递状态的不算没动静', () => {
+  const Q = QF.buildTodayQueue([
+    mkApp({ id: 'n1', channel: '官网', appliedAt: '2026-11-10', snooze: '2026-12-01' }),
+    mkApp({ id: 'n2', channel: '官网', appliedAt: '2026-11-10', events: [{ id: 'e9', type: 'followup', at: '2026-11-15T09:00', done: true }] }),
+    mkApp({ id: 'n3', channel: '官网', appliedAt: '2026-11-10', status: 'interview' }),
+    mkApp({ id: 'n4', channel: '官网', appliedAt: '2026-11-10', snooze: '2026-11-20' }),
+  ], TD, TM, RS, 0);
+  assert.deepEqual(plain(Q).map(x => x.app), ['n4'], '只剩推迟已过期的那条');
+});
+
+test('buildTodayQueue：复习题只有数量大于 0 时才进，且排在最后', () => {
+  assert.deepEqual(kinds(QF.buildTodayQueue([], TD, TM, RS, 0)), []);
+  const Q = QF.buildTodayQueue([mkApp({ id: 'a1', status: 'wish', due: '2026-11-26' })], TD, TM, RS, 5);
+  assert.deepEqual(kinds(Q), ['due', 'review']);
+  assert.equal(Q[1].n, 5);
+});
+
+test('buildTodayQueue：整体按紧急程度排序，坏数据不报错', () => {
+  const Q = QF.buildTodayQueue([
+    null, 'x', {},
+    mkApp({ id: 's1', channel: '官网', appliedAt: '2026-11-19' }),
+    mkApp({ id: 'i1', status: 'interview', events: [{ id: 'e1', type: 'interview', at: '2026-11-27T09:00', done: false }] }),
+    mkApp({ id: 'a1', status: 'wish', due: '2026-11-28' }),
+  ], TD, TM, RS, 2);
+  assert.deepEqual(kinds(Q), ['due', 'prep', 'stale', 'review']);
+  assert.deepEqual(plain(QF.buildTodayQueue(null, TD, TM, RS, 0)), []);
 });

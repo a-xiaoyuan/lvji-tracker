@@ -60,6 +60,23 @@ function replyStats(){const by={},all=[];for(const a of db.apps){const d=replyDa
  const q=(L,p)=>{const s=L.slice().sort((x,y)=>x-y);return s[Math.round(p*(s.length-1))];},mk=L=>L.length>=3?{n:L.length,med:q(L,.5),p80:q(L,.8)}:null;
  const R={_all:mk(all)};for(const k in by)R[k]=mk(by[k]);return R;}
 function waitFor(ch,RS){const x=RS[ch]||RS._all;return x?{d:Math.max(3,Math.min(21,x.p80+2)),x,own:!!RS[ch]}:{d:7};}
+/* 今日行动队列（概览页最上面）：把最要紧的事按紧急程度排好。纯函数，不读全局数据，方便测试。
+   入参：apps 投递列表；td 今天、tm 明天（YYYY-MM-DD）；RS replyStats() 的结果；reviewN 今天该复习的题数。
+   排序：rank 小的在前（截止 0 → 明天面试 1 → 没动静 2 → 复习 3）；同类里 key 小的在前
+   （截止按剩余天数、面试按时间、没动静按 key=-已等天数即等得越久越靠前）。 */
+function buildTodayQueue(apps,td,tm,RS,reviewN){
+ const Q=[],ended=s=>s==='rejected'||s==='dropped';
+ for(const a of apps||[]){
+  if(!a||typeof a!=='object'||ended(a.status))continue;
+  const base={app:a.id,company:String(a.company||''),role:String(a.role||'')};
+  if(a.status==='wish'&&a.due){const d=dayDiff(a.due,td);if(d<=3)Q.push({...base,kind:'due',what:'wish',rank:0,key:d,days:d});}
+  if(a.status==='offer'&&a.offer&&a.offer.deadline){const d=dayDiff(a.offer.deadline,td);if(d>=0&&d<=3)Q.push({...base,kind:'due',what:'offer',rank:0,key:d,days:d});}
+  if(a.status==='applied'&&a.appliedAt){const waited=dayDiff(td,a.appliedAt),w=waitFor(a.channel,RS||{});
+   if(waited>=w.d&&!(a.snooze&&a.snooze>td)&&!(a.events||[]).some(e=>e&&e.at&&e.at.slice(0,10)>=a.appliedAt))Q.push({...base,kind:'stale',rank:2,key:-waited,days:waited,wait:w.d,med:w.x?w.x.med:0,channel:String(a.channel||'')});}
+  for(const e of a.events||[]){if(e&&!e.done&&e.type==='interview'&&e.at&&e.at.slice(0,10)===tm)Q.push({...base,kind:'prep',rank:1,key:e.at,event:e.id,at:e.at,title:String(e.title||'')});}
+ }
+ if(reviewN>0)Q.push({kind:'review',rank:3,key:0,n:reviewN,company:'',role:''});
+ return Q.sort((x,y)=>x.rank-y.rank||(x.key<y.key?-1:x.key>y.key?1:0)||String(x.company||'').localeCompare(String(y.company||''),'zh'));}
 /* ========== AI 助手：通过本机小助手调用 DeepSeek / Claude Code / Codex ========== */
 const AI_URL='http://127.0.0.1:47321/api/ai',AI_NAME={deepseek:'DeepSeek',claude:'Claude Code',codex:'Codex'};
 let AIL=null,AIREQ=0,aiT0=0,aiIv=0;

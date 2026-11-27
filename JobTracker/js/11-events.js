@@ -28,6 +28,8 @@ document.addEventListener('click',e=>{
   if(act==='gostories'){closeModal();view='stories';if(openId)closeDrawer();return render();}
   if(act==='prepopen'){closeModal();return openDrawer(actEl.dataset.a);}
   if(act==='followcopy'){const a=appById(actEl.dataset.a),t=db.tpls.find(x=>x.id==='t3');if(a&&t){copyText(tplFill(t.body,a),'已复制跟进话术，去 Boss / 邮件里发给 HR 吧');a.snooze=dstr(new Date(Date.now()+5*864e5));touch(a);render();}return;}
+  if(act==='qopen'){closeModal();return openDrawer(actEl.dataset.a);}
+  if(act==='qfollow'){const a=appById(actEl.dataset.a);if(a){a.events.push({id:uid(),type:'followup',at:nowLocal(),title:'已跟进',place:'',done:true});touch(a);render();toast('已标记跟进：'+a.company);}return;}
   if(act==='snooze'){const a=appById(actEl.dataset.a);if(a){a.snooze=dstr(new Date(Date.now()+7*864e5));touch(a);render();toast('好的，7 天后再提醒');}return;}
   if(act==='mock')return openMock(actEl.dataset.a||openId||'');
   if(act==='mkstart')return mkStart();
