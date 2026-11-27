@@ -274,3 +274,60 @@ test('appReplied：自己写的笔记、跟进、模拟面试不算对方回复'
   assert.equal(F.appReplied({ status: 'rejected', fail: { reasons: ['算法题'] }, events: [] }), true);
   assert.equal(F.appReplied({ status: 'wish', events: [{ type: 'interview' }] }), false);
 });
+
+/* ---------- 四个新功能：定制简历 / 岗位订阅 / 通知入账 ---------- */
+const TG = load(['inResume', 'tailorGaps', 'tailorTitle']);
+test('tailorGaps：按 JD 关键词算简历覆盖', () => {
+  const F2 = [{ k: 'Redis' }, { k: 'Kafka' }, { k: 'Spring Boot' }];
+  const g = TG.tailorGaps(F2, '熟悉 Spring Boot 与 Redis，做过缓存设计。');
+  assert.equal(g.hit.join(','), 'Redis,Spring Boot');
+  assert.equal(g.miss.join(','), 'Kafka');
+  assert.equal(g.score, 67);
+  assert.equal(TG.tailorGaps([], 'x').score, 0);
+});
+test('tailorTitle：专属版名字带公司', () => {
+  assert.equal(TG.tailorTitle({ company: '星云科技' }), '星云科技 定制版');
+});
+
+const SJ = load(['coKey', 'jobKey', 'scoreJob', 'newJobs']);
+test('scoreJob：技能命中和岗位名都对上时高分', () => {
+  const skills = [{ name: 'Redis' }, { name: 'Kafka' }];
+  const full = SJ.scoreJob({ company: '甲公司', role: 'Java 后端工程师', jd: '需要 Redis、Kafka 经验', why: '' }, skills, '后端');
+  assert.equal(full.score, 100);
+  assert.equal(full.hits.join(','), 'Redis,Kafka');
+  const none = SJ.scoreJob({ company: '乙公司', role: '产品经理', jd: '负责需求文档', why: '' }, skills, '后端');
+  assert.equal(none.score, 0);
+});
+test('newJobs：见过的和已在跟进的都不算新', () => {
+  const list = [{ company: '甲公司', role: 'Java后端' }, { company: '乙公司', role: '前端工程师' }, { company: '丙公司', role: '测试工程师' }];
+  const seen = [SJ.jobKey(list[0])];
+  const apps = [{ company: '丙公司', role: '测试工程师' }];
+  assert.equal(SJ.newJobs(list, seen, apps).map(x => x.company).join(','), '乙公司');
+});
+
+const CN = load(['pad', 'dstr', 'today', 'classifyNotice']);
+test('classifyNotice：面试邀请认出类型和时间', () => {
+  const c = CN.classifyNotice('您好，邀请您参加我司 Java 工程师岗位的面试，时间 11月28日 下午2:30，腾讯会议 123-456-789', '2026-11-26');
+  assert.equal(c.kind, 'interview');
+  assert.equal(c.at, '2026-11-28T14:30');
+});
+test('classifyNotice：笔试、录用、拒信分得清', () => {
+  assert.equal(CN.classifyNotice('请于 2026-11-29 10:00 前完成在线测评（笔试），链接见正文', '2026-11-26').kind, 'test');
+  assert.equal(CN.classifyNotice('请于 2026-11-29 10:00 前完成在线测评（笔试），链接见正文', '2026-11-26').at, '2026-11-29T10:00');
+  assert.equal(CN.classifyNotice('恭喜您通过面试，我司决定录用，请于下周办理入职手续。', '2026-11-26').kind, 'offer');
+  assert.equal(CN.classifyNotice('感谢您投递我司岗位。很遗憾，您未能通过本轮筛选，祝您求职顺利。', '2026-11-26').kind, 'rejected');
+});
+test('classifyNotice：相对日期（明天）也能算', () => {
+  const c = CN.classifyNotice('请明天上午10点参加视频面试，提前 10 分钟进入会议', '2026-11-26');
+  assert.equal(c.kind, 'interview');
+  assert.equal(c.at, '2026-11-27T10:00');
+});
+
+/* ---------- 订阅自动扫描 ---------- */
+const DS = load(['dueSubs']);
+test('dueSubs：没扫过和超过 24 小时的算到期', () => {
+  const now = 1764244800000;
+  const subs = [{ id: 'a', lastRun: 0 }, { id: 'b', lastRun: now - 25 * 3600e3 }, { id: 'c', lastRun: now - 3600e3 }];
+  assert.equal(DS.dueSubs(subs, now).map(x => x.id).join(','), 'a,b');
+  assert.equal(DS.dueSubs([], now).length, 0);
+});

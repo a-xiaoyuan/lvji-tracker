@@ -26,3 +26,12 @@ chrome.runtime.sendMessage({ type: 'status' }, s => {
       ? line(false, '还没和履迹连上') + '<div class="t2">在这个浏览器里打开一次 <a href="http://127.0.0.1:47321/jobs/" target="_blank">履迹</a> 就会自动连上。用桌面快捷方式打开的履迹也算（同一个 Edge）。</div>'
       : line(true, '已连上履迹') + '<div class="t2">去 Boss直聘 正常投递就行，左下角会提示记录结果。</div>';
 });
+
+$('fillBtn').onclick = async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !/^https?:/.test(tab.url || '')) { $('fillMsg').textContent = '当前页面不能填表，打开一个网申页面再点。'; return; }
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['fill-rules.js', 'content-fill.js'] });
+    $('fillMsg').textContent = '已开始填表，看页面顶部的提示，核对后自己点提交。';
+  } catch (e) { $('fillMsg').textContent = '这个页面不让扩展填表：' + e.message; }
+};

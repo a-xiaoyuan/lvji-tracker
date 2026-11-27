@@ -45,6 +45,13 @@ document.addEventListener('click',e=>{
   if(act==='invback')return openInvite(INV?.text||'',INV?.aid||'');
   if(act==='invsave')return invSave();
   if(act==='jdadvice')return openJdAdvice(actEl.dataset.a);
+if(act==='tailorgo')return tailorGo(actEl.dataset.a);
+if(act==='tailorbind')return tailorBind(actEl.dataset.a);
+if(act==='huntsub')return huntSaveSub();
+if(act==='subscan')return subScan(actEl.dataset.a);
+if(act==='subdel'){const s2=db.subs.find(x=>x.id===actEl.dataset.a);if(s2){db.subs=db.subs.filter(x=>x!==s2);save();render();toast('已删除这个订阅');}return;}
+if(act==='notice')return openNotice();
+if(act==='noticego')return noticeGo();
   if(act==='jdadvice2')return openJdAdvice(JDA,true);
   if(act==='aicopy'){const o=document.getElementById('msgOut');return copyText(o?o.value:INV?.copy||'','已复制');}
   if(act==='aians')return aiAnswer(actEl.dataset.h,actEl);

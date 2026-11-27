@@ -23,6 +23,8 @@ function resumeFor(a){const L=ruyeDocs();if(!L.length)return null;const n=String
  const x=(n&&L.find(d=>{const t=ruyeTitle(d).toLowerCase();return t===n||t.includes(n)||n.includes(t);}))||L.find(d=>d.id===cur)||L[0];
  return {title:ruyeTitle(x),text:flatText(x.doc).join('\n'),guessed:!n};}
 function inResume(k,text){const T=text.toLowerCase(),kl=k.toLowerCase();if(/^[a-z0-9.+#/ -]+$/i.test(k))return new RegExp('(^|[^a-z0-9])'+kl.replace(/[.+#/*?()[\]{}|^$\\]/g,'\\$&')+'(?![a-z0-9+#])','i').test(T);return T.includes(kl);}
+function tailorGaps(F,text){const hit=[],miss=[];(F||[]).forEach(k=>{(inResume(k.k,text||'')?hit:miss).push(k.k);});const tot=hit.length+miss.length;return{hit,miss,score:tot?Math.round(hit.length/tot*100):0};}
+function tailorTitle(a){return ((a&&a.company)||'公司')+' 定制版';}
 function resumeMatchHtml(a,F){const R=resumeFor(a);if(!R)return `<div class="rm t2">还没有在「我的简历」里写简历，写好后这里会显示简历和 JD 的关键词覆盖情况。</div>`;
  const hit=F.filter(k=>inResume(k,R.text)),miss=F.filter(k=>!inResume(k,R.text)),sc=Math.round(hit.length/F.length*100);
  return `<div class="rm"><div class="jdh"><div class="ring2" style="--p:${sc}"><span><b>${sc}</b>%</span></div><div><div class="t1">简历覆盖度 · 《${esc(R.title)}》${R.guessed?'<span class="t2">（没指定简历，用的是当前简历）</span>':''}</div><div class="t2">JD 里的关键词有 ${hit.length}/${F.length} 个出现在简历中${miss.length?'，会的话可以写进简历，过筛更容易':''}</div></div></div>

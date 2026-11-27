@@ -69,3 +69,16 @@ test('自动记录关掉后不记（手动收藏照样能记）', async () => {
   assert.deepEqual(await x.msg({ type: 'record', item: job, key: 'k4' }), { ok: false, why: 'off' });
   assert.deepEqual(await x.msg({ type: 'record', item: { ...job, status: 'wish' }, key: 'k5', manual: true }), { ok: true });
 });
+
+test('网申填表规则：标签认得出对应档案字段', () => {
+  const ctx = {};
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'extension', 'fill-rules.js'), 'utf8'), ctx);
+  assert.equal(ctx.lvFieldFor('毕业院校'), 'school');
+  assert.equal(ctx.lvFieldFor('手机号码'), 'phone');
+  assert.equal(ctx.lvFieldFor('电子邮箱'), 'email');
+  assert.equal(ctx.lvFieldFor('所学专业'), 'major');
+  assert.equal(ctx.lvFieldFor('期望薪资'), 'salary');
+  assert.equal(ctx.lvFieldFor('意向城市'), 'cities');
+  assert.equal(ctx.lvFieldFor('自我介绍'), '');
+  assert.equal(ctx.lvFieldFor(''), '');
+});
