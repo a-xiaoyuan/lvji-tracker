@@ -173,6 +173,14 @@ test('buildTodayQueue：截止临近的待投递进队列，远的和已结束�
   assert.deepEqual(plain(Q).map(x => x.app), ['a4', 'a1', 'a2'], '已过期的最靠前，其次今天、3 天内；4 天后和已结束的不进');
   assert.ok(Q.every(x => x.kind === 'due' && x.what === 'wish'));
 });
+test('buildTodayQueue：心愿单过期超过 3 天就不再提醒', () => {
+  const Q = QF.buildTodayQueue([
+    mkApp({ id: 'w1', status: 'wish', due: '2026-11-23' }),
+    mkApp({ id: 'w2', status: 'wish', due: '2026-11-22' }),
+    mkApp({ id: 'w3', status: 'wish', due: '2026-10-01' }),
+  ], TD, TM, RS, 0);
+  assert.deepEqual(plain(Q).map(x => x.app), ['w1']);
+});
 
 test('buildTodayQueue：Offer 截止答复也算截止事项', () => {
   const Q = QF.buildTodayQueue([
@@ -184,7 +192,7 @@ test('buildTodayQueue：Offer 截止答复也算截止事项', () => {
   assert.equal(Q[0].what, 'offer'); assert.equal(Q[0].days, 2);
 });
 
-test('buildTodayQueue：明天的面试进队列，今天的、后天的、已完成的、笔试不进', () => {
+test('buildTodayQueue：明天的面试和笔试进队列（按时间排），今天的、后天的、已完成的不进', () => {
   const ev = (id, type, at, done) => ({ id, type, at, done: !!done, title: '技术面' });
   const Q = QF.buildTodayQueue([
     mkApp({ id: 'i1', status: 'interview', events: [ev('e1', 'interview', '2026-11-27T10:00')] }),
@@ -193,8 +201,8 @@ test('buildTodayQueue：明天的面试进队列，今天的、后天的、已�
     mkApp({ id: 'i4', status: 'interview', events: [ev('e4', 'interview', '2026-11-27T14:00', true)] }),
     mkApp({ id: 'i5', status: 'test', events: [ev('e5', 'test', '2026-11-27T09:00')] }),
   ], TD, TM, RS, 0);
-  assert.deepEqual(plain(Q).map(x => x.app), ['i1']);
-  assert.equal(Q[0].kind, 'prep'); assert.equal(Q[0].event, 'e1');
+  assert.deepEqual(plain(Q).map(x => x.app), ['i5', 'i1']);
+  assert.equal(Q[0].etype, 'test'); assert.equal(Q[1].kind, 'prep'); assert.equal(Q[1].event, 'e1');
 });
 
 test('buildTodayQueue：没动静按本渠道的回复门槛判断，别的渠道用整体门槛', () => {

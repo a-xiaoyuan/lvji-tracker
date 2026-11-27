@@ -56,13 +56,9 @@ function huntStart(){return db.settings.startDate||db.apps.map(a=>a.appliedAt).f
 function huntDays(){return Math.max(1,dayDiff(today(),huntStart())+1);}
 function todayCard(){const td=today(),tm=dstr(new Date(Date.now()+864e5)),now=nowLocal(),I=[];
  for(const {a,e} of allEvents()){if(!e.at)continue;const d=e.at.slice(0,10);
-  if(d===td)I.push({ic:e.type==='interview'?'🎤':e.type==='test'?'📝':'📌',t:`${e.at.slice(11,16)} ${esc(a.company)} · ${esc(e.title||EV[e.type])}`,done:e.done||(e.type!=='interview'&&e.type!=='test'&&e.at<now),open:a.id,btn:(e.type==='interview'||e.type==='test')&&!e.done?`<button class="btn sm" data-act="prep" data-a="${a.id}" data-e="${e.id}">🎯 备战</button>`:'',k:0});
-  else if(d===tm&&!e.done&&(e.type==='interview'||e.type==='test'))I.push({ic:'🌙',t:`明天 ${e.at.slice(11,16)} ${esc(a.company)} ${esc(e.title||EV[e.type])}，今晚过一遍备战卡`,done:!!(e.prep&&Object.values(e.prep).filter(Boolean).length>=4),btn:`<button class="btn sm" data-act="prep" data-a="${a.id}" data-e="${e.id}">🎯 备战</button>`,k:1});}
- for(const a of db.apps)if(a.status==='wish'&&a.due&&a.due>=td&&a.due<=tm)I.push({ic:'⏳',t:`${esc(a.company)} · ${esc(a.role)} ${a.due===td?'今天':'明天'}截止投递`,open:a.id,k:2});
+  if(d===td)I.push({ic:e.type==='interview'?'🎤':e.type==='test'?'📝':'📌',t:`${e.at.slice(11,16)} ${esc(a.company)} · ${esc(e.title||EV[e.type])}`,done:e.done||(e.type!=='interview'&&e.type!=='test'&&e.at<now),open:a.id,btn:(e.type==='interview'||e.type==='test')&&!e.done?`<button class="btn sm" data-act="prep" data-a="${a.id}" data-e="${e.id}">🎯 备战</button>`:'',k:0});}
  const goal=+db.settings.weekGoal||0;if(goal){const ws=weekStart(),sent=db.apps.filter(a=>a.status!=='wish'&&a.appliedAt&&new Date(a.appliedAt+'T00:00')>=ws),left=goal-sent.length,days=7-dayDiff(td,dstr(ws)),tn=db.apps.filter(a=>a.status!=='wish'&&a.appliedAt===td).length;
   if(left>0||tn){const need=Math.max(0,Math.ceil(Math.max(0,left+tn)/Math.max(1,days)));if(need||tn)I.push({ic:'📮',t:tn>=need?`今天已投 ${tn} 个，达标了${left>0?`（本周还差 ${left} 个）`:'，本周目标也完成了'}`:`今天目标投 ${need} 个，已投 ${tn} 个（本周还差 ${left} 个）`,done:tn>=need,btn:tn<need?`<button class="btn sm" data-act="add">＋ 记一个</button>`:'',k:3});}}
- const Q=allQuestions().filter(x=>!x.dup&&db.qmark[x.h]!=='ok'&&(!db.qsrs[x.h]||db.qsrs[x.h].due<=td)).length;
- if(Q)I.push({ic:'🎴',t:`${Q} 道面试题到期该复习了`,btn:`<button class="btn sm" data-act="review">开始</button>`,k:4});
  if(db.settings.lcUser&&db.lc){const T=lcToday(),L=db.lc;I.push({ic:'🧩',t:T.ac.length?`今天力扣已通过 ${T.ac.length} 题${T.dailyDone?'，每日一题也做了':''}`:`今天还没刷力扣${L.daily?` · 每日一题「${esc(L.daily.title)}」${LC_DN[L.daily.difficulty]||''}`:''}`,done:T.ac.length>0,btn:T.ac.length||!L.daily?'':ext(lcLink(L.daily.slug),'去做 ↗'),k:4});}
  const dp=duePeople().length;if(dp)I.push({ic:'🤝',t:`${dp} 位联系人该跟进了`,view:'people',k:5});
  I.push({ic:'📓',t:'写一句今天的日记，记下努力的自己',done:jActive(td),view:'journal',k:6});
@@ -94,9 +90,9 @@ function todayQueueCard(){
  const reviewN=allQuestions().filter(x=>!x.dup&&db.qmark[x.h]!=='ok'&&(!db.qsrs[x.h]||db.qsrs[x.h].due<=td)).length;
  const Q=buildTodayQueue(db.apps,td,tm,RS,reviewN),show=Q.slice(0,10);
  const row=x=>{
-  if(x.kind==='due')return `<div class="alert">⏳ <b>${esc(x.company)}</b> · ${esc(x.role)} ${x.what==='offer'?'Offer '+(x.days===0?'今天':x.days+' 天后')+'截止答复':(x.days<0?'投递已过期 '+(-x.days)+' 天':x.days===0?'今天截止投递':x.days+' 天后截止投递')}<span style="flex:1"></span><button class="btn sm" data-act="qopen" data-a="${x.app}">打开详情</button></div>`;
-  if(x.kind==='prep')return `<div class="alert">🎤 <b>${esc(x.company)}</b> · ${esc(x.title||'面试')} 明天 ${esc(x.at.slice(11,16))}<span style="flex:1"></span><button class="btn sm" data-act="prep" data-a="${x.app}" data-e="${x.event}">🎯 打开面试准备</button></div>`;
-  if(x.kind==='stale')return `<div class="alert">📨 <b>${esc(x.company)}</b> · ${esc(x.role)} 投递 ${x.days} 天没动静${x.med?`<span class="t2">（${esc(x.channel)}通常 ${x.med} 天内有回音）</span>`:''}<span style="flex:1"></span><button class="btn sm" data-act="qfollow" data-a="${x.app}">标记已跟进</button><button class="btn sm ghost" data-act="qopen" data-a="${x.app}">打开详情</button></div>`;
+  if(x.kind==='due')return `<div class="alert" data-open="${x.app}">⏳ <b>${esc(x.company)}</b> · ${esc(x.role)} ${x.what==='offer'?'Offer '+(x.days===0?'今天':x.days+' 天后')+'截止答复':(x.days<0?'投递已过期 '+(-x.days)+' 天':x.days===0?'今天截止投递':x.days+' 天后截止投递')}<span style="flex:1"></span></div>`;
+  if(x.kind==='prep')return `<div class="alert" data-open="${x.app}">${x.etype==='test'?'📝':'🎤'} <b>${esc(x.company)}</b> · ${esc(x.title||(x.etype==='test'?'笔试':'面试'))} 明天 ${esc(x.at.slice(11,16))}<span style="flex:1"></span><button class="btn sm" data-act="prep" data-a="${x.app}" data-e="${x.event}">🎯 备战</button></div>`;
+  if(x.kind==='stale')return `<div class="alert" data-open="${x.app}">📨 <b>${esc(x.company)}</b> · ${esc(x.role)} 投递 ${x.days} 天没动静${x.med?`<span class="t2">（${esc(x.channel)}通常 ${x.med} 天内有回音）</span>`:''}<span style="flex:1"></span>${db.tpls.find(t=>t.id==='t3')?`<button class="btn sm" data-act="followcopy" data-a="${x.app}">📋 复制跟进话术</button>`:''}<button class="btn sm ghost" data-act="qfollow" data-a="${x.app}" title="已经用别的方式跟进过了">已跟进</button><button class="btn sm ghost" data-act="snooze" data-a="${x.app}" title="7 天后再提醒">再等等</button><button class="btn sm ghost" data-act="ghosted" data-a="${x.app}" title="移到「未通过」">没戏了</button></div>`;
   return `<div class="alert">🎴 今天有 <b>${x.n}</b> 道面试题该复习<span style="flex:1"></span><button class="btn sm" data-act="review">开始复习</button></div>`;};
  return `<div class="card sec" style="margin-bottom:16px"><h3>⚡ 今日行动队列<span class="m">按紧急程度排</span></h3>${show.length?show.map(row).join(''):'<div class="empty">今天没有要紧的事，按自己的节奏来 🎉</div>'}${Q.length>show.length?`<div class="t2" style="margin-top:6px">还有 ${Q.length-show.length} 条排在后面，先处理上面这些。</div>`:''}</div>`;}
 function vDash(){
@@ -124,7 +120,6 @@ function vDash(){
  const hasSample=A.some(a=>a.sample);
  return `${todayQueueCard()}${meCard()}${A.length?mascotHtml():''}${A.length?todayCard():vEmpty()}${lcCard()}
  ${hasSample?`<div class="alert info">ℹ️ 当前包含示例数据，熟悉后可以<a href="#" data-act="clearsample" style="margin-left:4px">一键清除示例</a></div>`:''}
- ${dl.map(a=>`<div class="alert" data-open="${a.id}">⏰ <b>${esc(a.company)}</b> 的 Offer 将在 ${dayDiff(a.offer.deadline,today())===0?'今天':dayDiff(a.offer.deadline,today())+' 天后'}截止答复</div>`).join('')}
  ${goal?`<div class="card goal"><div><div class="t1">本周投递目标</div><div class="t2">${weekN>=goal?'🎉 已完成，继续保持':'还差 '+(goal-weekN)+' 个'}</div></div><div class="bar"><i style="width:${Math.min(100,weekN/goal*100)}%"></i></div><div class="big">${weekN}<span class="t2"> / ${goal}</span></div><button class="btn sm ghost" data-view="settings">调整</button></div>`:''}
  <div class="grid kpis">
   <div class="card kpi"><div class="l">累计投递</div><div class="v">${sent.length}</div><div class="h">待投递 ${A.length-sent.length} 个</div></div>
@@ -138,13 +133,11 @@ function vDash(){
    ${up.length?up.map(({a,e})=>`<div class="ev-row" data-open="${a.id}">${whenBox(e.at)}<div style="flex:1;min-width:0"><div class="t1">${esc(a.company)} · ${esc(e.title||EV[e.type])} ${clashTag(e,a)}</div><div class="t2">${esc(a.role)} · ${EV[e.type]} · ${+e.at.slice(5,7)}月${+e.at.slice(8,10)}日 ${e.at.slice(11,16)}${e.place?' · '+esc(e.place):''}</div></div>${(e.type==='interview'||e.type==='test')?`<button class="btn sm" data-act="prep" data-a="${a.id}" data-e="${e.id}" title="面试备战卡">🎯 准备</button>`:''}${/^https?:/.test(e.place||'')?ext(safeUrl(e.place),'进入会议','btn sm'):stTag(a.status)}</div>`).join(''):'<div class="empty">没有即将到来的笔试或面试。在投递详情里可以添加日程。</div>'}
   </div>
   <div class="card sec"><h3>✅ 待办提醒</h3>
-   ${dueSoon.map(a=>`<div class="alert" data-open="${a.id}">⏳ <b>${esc(a.company)}</b> · ${esc(a.role)} ${dayDiff(a.due,today())===0?'今天':dayDiff(a.due,today())+' 天后'}截止投递，还没投</div>`).join('')}
    ${review.map(({a,e})=>`<div class="alert" data-open="${a.id}">📝 ${esc(a.company)} 的「${esc(e.title||'面试')}」还没写复盘，趁记忆清楚补一下<span style="flex:1"></span><button class="btn sm" data-act="rvopen" data-a="${a.id}" data-e="${e.id}">📝 3 步复盘</button></div>`).join('')}
-   ${stale.map(a=>`<div class="alert" data-open="${a.id}">📨 ${esc(a.company)} · ${esc(a.role)} 投递 ${dayDiff(today(),a.appliedAt)} 天无回音${(w=>w.x?`<span class="t2">（${w.own?esc(a.channel):'你的投递'}通常 ${w.x.med} 天内有回音，大概率没戏了）</span>`:'')(waitFor(a.channel,RS))}<span style="flex:1"></span>${db.tpls.find(t=>t.id==='t3')?`<button class="btn sm" data-act="followcopy" data-a="${a.id}">📋 复制跟进话术</button>`:''}<button class="btn sm ghost" data-act="snooze" data-a="${a.id}" title="7 天后再提醒">再等等</button><button class="btn sm ghost" data-act="ghosted" data-a="${a.id}" title="移到「未通过」">没戏了</button></div>`).join('')}
    ${IVS.L.map(({a,e,days})=>`<div class="alert" data-open="${a.id}">⏳ ${esc(a.company)} ${esc(e.title||EV[e.type])}后 ${days} 天没消息<span class="t2">（${IVS.S?`你的面试一般 ${IVS.S.med} 天内就有下文`:'一般一周内会有下文'}，可以问一下进度）</span><span style="flex:1"></span><button class="btn sm" data-act="ivmsg" data-a="${a.id}">✨ AI 问进度</button><button class="btn sm ghost" data-act="snooze" data-a="${a.id}" title="7 天后再提醒">再等等</button><button class="btn sm ghost" data-act="ivdead" data-a="${a.id}" title="移到「未通过」">没戏了</button></div>`).join('')}
    ${duePeople().map(p=>`<div class="alert" data-view="people">🤝 该联系 <b>${esc(p.name)}</b>${p.company?'（'+esc(p.company)+'）':''} 了${p.notes?' · '+esc(p.notes.slice(0,30)):''}</div>`).join('')}
    ${AGA.map(a=>`<div class="alert ${a.lv==='bad'?'bad':''}">🤖 ${esc(a.msg)}<span style="flex:1"></span><button class="btn sm" data-view="agent">查看</button><button class="btn sm ghost" data-act="agsnooze" data-k="${esc(a.k)}" title="7 天内不再提醒这一条">知道了</button></div>`).join('')}
-   ${!AGA.length&&!dueSoon.length&&!review.length&&!stale.length&&!duePeople().length?'<div class="empty">暂时没有需要处理的事项 🎉</div>':''}
+   ${!AGA.length&&!review.length&&!IVS.L.length&&!duePeople().length?'<div class="empty">暂时没有需要处理的事项 🎉</div>':''}
   </div>
  </div>
  <div class="grid two" style="margin-top:16px">
