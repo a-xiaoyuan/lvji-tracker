@@ -98,3 +98,10 @@ test('网申填表：从履迹的数据文件里读到「关于我」档案', as
   assert.equal(r.profile.name, '测试同学');
   assert.equal(r.profile.school, '示例大学');
 });
+
+test('扩展清单：四个招聘网站都挂了内容脚本，文件都在', () => {
+  const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'extension', 'manifest.json'), 'utf8'));
+  const hosts = m.content_scripts.flatMap(c => c.matches).join(' ');
+  for (const h of ['zhipin.com', 'nowcoder.com', 'zhaopin.com', '51job.com']) assert.ok(hosts.includes(h), '清单里缺 ' + h);
+  for (const c of m.content_scripts) for (const f of c.js) assert.ok(fs.existsSync(path.join(ROOT, 'extension', f)), '清单里的文件不存在：' + f);
+});
