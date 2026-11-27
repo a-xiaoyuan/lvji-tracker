@@ -33,7 +33,18 @@ function kwFind(text){const T=String(text||'').toLowerCase();if(T.length<8)retur
   else if(T.includes(kl))found.add(k);}
  const L=[...found];return L.filter(k=>!L.some(o=>o!==k&&o.toLowerCase().includes(k.toLowerCase())));}
 function skillFor(k){const b=k.toLowerCase();return db.skills.find(x=>{const a=x.name.toLowerCase();return a===b||(a.length>1&&b.includes(a))||(b.length>1&&a.includes(b));});}
-function jdHtml(text,a){const F=kwFind(text);if(!F.length)return '<div class="t2" style="margin-top:6px">还没识别出技术关键词，可以多粘贴一些 JD 原文。</div>';
+const RED_RULES=[
+ {lv:'bad',re:/培训贷|先培训|培训后上岗|0\s*元入学|零元入学|就业保障协议|贷款培训|分期.{0,6}培训/,t:'疑似培训贷 / 先培训后上岗：正规招聘不会让求职者先交钱学技术'},
+ {lv:'bad',re:/押金|保证金|服装费|培训费|工牌费|报名费|体检费自理/,t:'要先交钱（押金 / 培训费等）：正规公司不会向求职者收费'},
+ {lv:'bad',re:/月入过万|月薪过万|年薪百万/,t:'高薪话术要打问号：问清底薪、绩效占比和发放条件'},
+ {lv:'warn',re:/大小周|单休|单双休|弹性工作制|弹性上下班/,t:'休息制度要问清：大小周 / 单休 / 弹性，往往意味着加班多'},
+ {lv:'warn',re:/抗压能力强|吃苦耐劳|狼性|奉献精神|服从安排/,t:'这类词密集出现，通常对应高强度、低回报'},
+ {lv:'warn',re:/薪资面议|工资面议|待遇面议/,t:'薪资面议：面试前先问清范围，别面完才谈钱'}];
+function redFlags(text){const T=String(text||'');if(T.length<30)return [];return RED_RULES.filter(r=>r.re.test(T)).map(r=>({lv:r.lv,t:r.t}));}
+function redFlagsHtml(text){const F=redFlags(text);if(!F.length)return '';
+ return `<div>${F.map(f=>`<div class="alert ${f.lv==='bad'?'bad':''}" style="margin-top:6px">🚩 ${esc(f.t)}</div>`).join('')}</div>`;}
+function jdHtml(text,a){return jdHtmlCore(text,a)+redFlagsHtml(text);}
+function jdHtmlCore(text,a){const F=kwFind(text);if(!F.length)return '<div class="t2" style="margin-top:6px">还没识别出技术关键词，可以多粘贴一些 JD 原文。</div>';
  const rows=F.map(k=>{const x=skillFor(k);return {k,x,lv:x?(+x.level||0):-1};}).sort((a,b)=>b.lv-a.lv);
  const score=Math.round(rows.reduce((t,r)=>t+(r.lv<0?0:Math.min(r.lv,4)/4),0)/rows.length*100);
  JD_MISSING=rows.filter(r=>!r.x).map(r=>r.k);

@@ -125,4 +125,13 @@ test('weakQuestions：只留下出自弱项场次的题目', () => {
   const Q = [{ h: '1', e: { weak: ['项目深挖'] } }, { h: '2', e: { weak: ['算法题'] } }, { h: '3', e: {} }];
   assert.equal(WQ.weakQuestions(Q, ['项目深挖']).map(x => x.h).join(','), '1');
   assert.equal(WQ.weakQuestions(Q, []).length, 0);
+test('JD 红旗检测：收费和培训贷是高危，加班话术是提醒', () => {
+  const F = load(['RED_RULES', 'redFlags']);
+  const bad = F.redFlags('本岗位先培训后上岗，0元入学，入职需交服装费和押金，表现好月入过万不是梦。我们提供系统培训和就业保障。');
+  assert.ok(bad.some(f => f.lv === 'bad' && f.t.includes('培训贷')), JSON.stringify(bad));
+  assert.ok(bad.some(f => f.t.includes('交钱')));
+  const warn = F.redFlags('要求抗压能力强，能吃苦耐劳，公司实行大小周，薪资面议，期待有狼性的你加入我们团队，一起成长。');
+  assert.ok(warn.length >= 2 && warn.every(f => f.lv === 'warn'), JSON.stringify(warn));
+  assert.equal(F.redFlags('负责后端服务开发，要求熟悉 Java 和 Spring Boot，有良好的编码习惯和团队协作能力，双休。').length, 0);
+  assert.equal(F.redFlags('大小周').length, 0); // 太短不判断
 });
