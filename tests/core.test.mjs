@@ -322,6 +322,10 @@ test('classifyNotice：拒信里提到 offer 不算录用；通过一面邀请�
   assert.equal(CN.classifyNotice('恭喜您通过初面！邀请您参加 11月28日 下午3点 的复试面试', '2026-11-26').kind, 'interview');
   assert.equal(CN.classifyNotice('我们很高兴向您发放正式 offer，请查收附件中的 offer letter', '2026-11-26').kind, 'offer');
 });
+test('classifyNotice：通过笔试、邀请参加面试的算面试', () => {
+  assert.equal(CN.classifyNotice('恭喜您通过笔试！邀请您参加 2026-12-02 15:00 的一面，腾讯会议', '2026-11-26').kind, 'interview');
+  assert.equal(CN.classifyNotice('您的简历已通过初筛，请于 2026-12-01 前完成在线测评', '2026-11-26').kind, 'test');
+});
 test('classifyNotice：相对日期（明天）也能算', () => {
   const c = CN.classifyNotice('请明天上午10点参加视频面试，提前 10 分钟进入会议', '2026-11-26');
   assert.equal(c.kind, 'interview');
@@ -335,4 +339,14 @@ test('dueSubs：没扫过和超过 24 小时的算到期', () => {
   const subs = [{ id: 'a', lastRun: 0 }, { id: 'b', lastRun: now - 25 * 3600e3 }, { id: 'c', lastRun: now - 3600e3 }];
   assert.equal(DS.dueSubs(subs, now).map(x => x.id).join(','), 'a,b');
   assert.equal(DS.dueSubs([], now).length, 0);
+});
+
+test('页面脚本不调用不存在的 save()（保存数据用 persist()）', async () => {
+  const fs = await import('node:fs'), path = await import('node:path');
+  const { ROOT } = await import('./extract.mjs');
+  const dir = path.join(ROOT, 'JobTracker', 'js');
+  for (const f of fs.readdirSync(dir)) {
+    const t = fs.readFileSync(path.join(dir, f), 'utf8');
+    assert.ok(!/(^|[^\w.$])save\(\)/m.test(t), f + ' 里调用了 save()');
+  }
 });
