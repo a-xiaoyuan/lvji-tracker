@@ -49,6 +49,7 @@ if(act==='tailorgo')return tailorGo(actEl.dataset.a);
 if(act==='tailorbind')return tailorBind(actEl.dataset.a);
 if(act==='huntsub')return huntSaveSub();
 if(act==='subscan')return subScan(actEl.dataset.a);
+if(act==='subauto'){db.settings.subAuto=!db.settings.subAuto;save();render();toast(db.settings.subAuto?'已打开：以后打开履迹时自动扫描到期的订阅':'已关闭自动扫描，需要时手动点「扫描新岗位」');return;}
 if(act==='subdel'){const s2=db.subs.find(x=>x.id===actEl.dataset.a);if(s2){db.subs=db.subs.filter(x=>x!==s2);save();render();toast('已删除这个订阅');}return;}
 if(act==='notice')return openNotice();
 if(act==='noticego')return noticeGo();
