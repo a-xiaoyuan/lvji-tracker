@@ -2,11 +2,12 @@
 // 给一个表单字段旁边的文字（标签 / 占位符 / 字段名），返回它对应个人档案里的哪个字段；认不出返回空。
 // 顺序很重要：先具体的、后宽泛的。
 const LV_FILL_RULES = [
-  [/姓名|名字|name/i, 'name'],
-  [/手机|电话|phone|mobile/i, 'phone'],
-  [/邮箱|邮件|e-?mail/i, 'email'],
+  [/公司|单位|company|用户名|账号|帐号|user\s*name|login|密码|password|验证码/i, ''],
   [/学校|院校|school|university/i, 'school'],
   [/专业|major/i, 'major'],
+  [/姓名|名字|\bname\b/i, 'name'],
+  [/手机|电话|phone|mobile/i, 'phone'],
+  [/邮箱|邮件|e-?mail/i, 'email'],
   [/学历|学位|degree|education/i, 'degree'],
   [/毕业|graduat/i, 'gradYear'],
   [/gpa|绩点|成绩/i, 'gpa'],

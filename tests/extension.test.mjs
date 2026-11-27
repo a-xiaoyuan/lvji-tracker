@@ -8,6 +8,7 @@ import { ROOT } from './extract.mjs';
 
 function boot({ online = true, token = 't' } = {}) {
   const store = { token }, calls = [];
+  let respond = () => ({ ok: true });
   let handler;
   const chrome = {
     storage: { local: {
@@ -20,11 +21,11 @@ function boot({ online = true, token = 't' } = {}) {
   const fetch = async (url, o = {}) => {
     calls.push({ url, body: o.body && JSON.parse(o.body) });
     if (!online) throw new TypeError('Failed to fetch');
-    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    return { ok: true, status: 200, json: async () => respond(url) };
   };
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'extension', 'background.js'), 'utf8'), { chrome, fetch, console, structuredClone });
   const msg = (m, tab = { url: 'https://www.zhipin.com/job_detail/abc.html?ka=x' }) => new Promise(r => handler(m, { tab }, v => r(JSON.parse(JSON.stringify(v)))));
-  return { store, calls, msg };
+  return { store, calls, msg, setResponse: f => { respond = f; } };
 }
 const job = { kind: 'job', status: 'applied', channel: 'Boss直聘', company: '星河云', role: 'Java开发' };
 
@@ -80,5 +81,20 @@ test('网申填表规则：标签认得出对应档案字段', () => {
   assert.equal(ctx.lvFieldFor('期望薪资'), 'salary');
   assert.equal(ctx.lvFieldFor('意向城市'), 'cities');
   assert.equal(ctx.lvFieldFor('自我介绍'), '');
+  // 容易认错的：别把你的名字填进学校、公司、账号里
+  assert.equal(ctx.lvFieldFor('学校名称 school_name'), 'school');
+  assert.equal(ctx.lvFieldFor('Company name'), '');
+  assert.equal(ctx.lvFieldFor('userName 用户名'), '');
+  assert.equal(ctx.lvFieldFor('真实姓名'), 'name');
+  assert.equal(ctx.lvFieldFor('name'), 'name');
   assert.equal(ctx.lvFieldFor(''), '');
+});
+
+test('网申填表：从履迹的数据文件里读到「关于我」档案', async () => {
+  const x = boot();
+  x.setResponse(url => url.endsWith('/jobtracker') ? { savedAt: 1, data: { settings: { profile: { name: '测试同学', school: '示例大学' } } } } : { ok: true });
+  const r = await x.msg({ type: 'profile' });
+  assert.equal(r.ok, true);
+  assert.equal(r.profile.name, '测试同学');
+  assert.equal(r.profile.school, '示例大学');
 });
