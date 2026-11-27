@@ -85,6 +85,26 @@ function pStats([a,b]){const inR=d=>!!d&&d>=a&&d<=b,J=db.journal.filter(x=>inR(x
   habits:Object.fromEntries(db.habits.map(h=>[h.id,J.filter(x=>x.habits?.[h.id]).length])),
   mood:M.length?M.reduce((t,x)=>t+x.mood,0)/M.length:0,
   moves:db.apps.flatMap(x=>x.history.filter(h=>h.from&&inR(h.at.slice(0,10))).map(h=>({a:x,h}))).sort((x,y)=>y.h.at.localeCompare(x.h.at))};}
+function posterStats(d,qn){const apps=d.apps||[];const sent=apps.filter(a=>a.status!=='wish'&&a.appliedAt);
+ let iv=0,ts=0;for(const a of apps)for(const e of a.events||[]){if(e.type==='interview')iv++;if(e.type==='test')ts++;}
+ const start=(d.settings&&d.settings.startDate)||apps.map(a=>a.appliedAt).filter(Boolean).sort()[0]||today();
+ return {days:dayDiff(today(),start)+1,sent:sent.length,iv,ts,qn:qn||0,offers:apps.filter(a=>a.status==='offer').length,ms:(d.milestones||[]).slice(-3).map(m=>({d:m.date,t:m.title}))};}
+function openPoster(){const S=posterStats(db,allQuestions().length);
+ aiModal('🎨 我的求职季',`<canvas id="posterCv" width="720" height="1080" style="width:100%;border-radius:12px;display:block"></canvas><div class="mfoot"><button class="btn" data-act="mclose">关闭</button><button class="btn primary" data-act="posterdown">⬇ 保存图片</button></div>`);
+ drawPoster(S);}
+function drawPoster(S){const cv=document.getElementById('posterCv');if(!cv)return;const g=cv.getContext('2d');
+ const gr=g.createLinearGradient(0,0,720,1080);gr.addColorStop(0,'#1b1b2f');gr.addColorStop(1,'#3a2b5c');g.fillStyle=gr;g.fillRect(0,0,720,1080);
+ g.fillStyle='#ffd166';g.beginPath();g.arc(628,110,140,0,7);g.fill();g.fillStyle='#23233c';g.beginPath();g.arc(672,84,128,0,7);g.fill();
+ const F=(w,s)=>`${w} ${s}px "PingFang SC","Microsoft YaHei",sans-serif`;
+ g.fillStyle='#ffffff';g.font=F(900,64);g.fillText('我的求职季',56,140);
+ g.fillStyle='#c9c4e5';g.font=F(400,28);g.fillText(`第 ${S.days} 天 · 还在路上，也一直在进步`,56,196);
+ const cells=[['投递',S.sent],['面试',S.iv],['笔试',S.ts],['攒下的题',S.qn],['Offer',S.offers],['坚持天数',S.days]];
+ cells.forEach((c,i)=>{const x=56+(i%3)*216,y=280+Math.floor(i/3)*196;g.fillStyle='rgba(255,255,255,0.08)';g.fillRect(x,y,192,156);g.fillStyle='#ffd166';g.font=F(900,60);g.fillText(String(c[1]),x+24,y+80);g.fillStyle='#c9c4e5';g.font=F(400,26);g.fillText(c[0],x+24,y+124);});
+ g.fillStyle='#ffffff';g.font=F(700,32);g.fillText('这一路的高光时刻',56,724);
+ g.fillStyle='#e8e4f5';g.font=F(400,26);
+ const lines=S.ms.length?S.ms.map(m=>`${m.d}  ${m.t}`):['（去「回顾与历程」里记下你的第一个里程碑）'];
+ lines.forEach((t,i)=>g.fillText(t.slice(0,25),56,780+i*48));
+ g.fillStyle='#8f89ad';g.font=F(400,24);g.fillText(`履迹 · ${today()}`,56,1024);}
 function milestones(){const L=[{d:huntStart(),e:'🚀',t:'开始求职'}];
  const sent=db.apps.filter(a=>a.status!=='wish'&&a.appliedAt).sort((a,b)=>a.appliedAt.localeCompare(b.appliedAt));
  if(sent[0])L.push({d:sent[0].appliedAt,e:'📮',t:'第一次投递：'+sent[0].company});
@@ -122,6 +142,6 @@ function vReview(){const R=pRange(rvU,rvO),c=pStats(R),p=pStats(pRange(rvU,rvO+1
  ${failCard()}
  ${resumeCard()}
  <div class="card sec" style="margin-top:16px"><h3>🧭 我的历程<span class="m">重要的节点会自动记下，也可以自己添加</span></h3>
-  <div class="tools"><input type="date" class="inp" id="msDate" value="${today()}" max="${today()}"><input class="inp" id="msTitle" placeholder="比如：第一次独立做完一个项目、拿到第一个内推……" style="flex:1;min-width:220px"><button class="btn sm primary" data-act="addms">＋ 添加</button></div>
+  <div class="tools"><input type="date" class="inp" id="msDate" value="${today()}" max="${today()}"><input class="inp" id="msTitle" placeholder="比如：第一次独立做完一个项目、拿到第一个内推……" style="flex:1;min-width:220px"><button class="btn sm primary" data-act="addms">＋ 添加</button><button class="btn sm" data-act="poster">🎨 生成求职季海报</button></div>
   <div class="tl">${milestones().map((m,i)=>`<div class="it" data-e="${m.e}" style="--n:${i}"><div class="t1">${esc(m.t)}${m.id?` <a href="#" data-delms="${m.id}" class="t2" title="删除" style="font-weight:400">✕</a>`:''}</div><div class="t2">${m.d}</div></div>`).join('')}</div></div>`;}
 

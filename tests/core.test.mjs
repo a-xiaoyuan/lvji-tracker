@@ -136,3 +136,16 @@ test('JD 红旗检测：收费和培训贷是高危，加班话术是提醒', ()
   assert.equal(F.redFlags('负责后端服务开发，要求熟悉 Java 和 Spring Boot，有良好的编码习惯和团队协作能力，双休。').length, 0);
   assert.equal(F.redFlags('大小周').length, 0); // 太短不判断
 });
+
+test('海报数据和吉祥物阶段', () => {
+  const F = load(['dayDiff', 'posterStats', 'mascotStage'], { today: () => '2026-11-26' });
+  const d = { settings: { startDate: '2026-11-20' }, milestones: [{ date: '2026-11-21', title: '第一次面试' }], apps: [
+    { status: 'offer', appliedAt: '2026-11-20', events: [{ type: 'interview' }, { type: 'test' }] },
+    { status: 'applied', appliedAt: '2026-11-22', events: [] }] };
+  const S = F.posterStats(d, 42);
+  assert.equal(S.days, 7); assert.equal(S.sent, 2); assert.equal(S.iv, 1); assert.equal(S.ts, 1); assert.equal(S.offers, 1); assert.equal(S.qn, 42);
+  assert.equal(F.mascotStage(d.apps).e, '😎');
+  assert.equal(F.mascotStage([{ status: 'applied', events: [] }]).e, '🏃');
+  assert.equal(F.mascotStage([{ status: 'wish', events: [] }]).e, '🌱');
+  assert.equal(F.mascotStage([{ status: 'applied', events: [{ type: 'interview', done: false }] }]).e, '👔');
+});

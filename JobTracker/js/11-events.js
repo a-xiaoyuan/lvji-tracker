@@ -111,6 +111,8 @@ document.addEventListener('click',e=>{
   if(act==='review')return startReview();
   if(act==='weakreview')return startReview(true);
   if(act==='jdadd'){const n=JD_MISSING.length;JD_MISSING.forEach(name=>db.skills.push({id:uid(),name,cat:'待分类',level:1,target:3,notes:'从岗位 JD 里加入',link:''}));persist();const nj=document.getElementById('nJD');if(nj)document.getElementById('jdBox').innerHTML=jdHtml(nj.value);else if(openId)renderDrawer();return toast(`已把 ${n} 项加入能力树，去给自己打个分吧`);}
+  if(act==='poster')return openPoster();
+  if(act==='posterdown'){const cv=document.getElementById('posterCv');if(cv)cv.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='求职季海报.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),4000);});return;}
   if(act==='addms'){const d=document.getElementById('msDate').value,t=document.getElementById('msTitle').value.trim();if(!t){document.getElementById('msTitle').focus();return toast('写一下这个里程碑');}db.milestones.push({id:uid(),date:d||today(),title:t});persist();render();return toast('⭐ 已记进你的历程');}
   if(act==='copyreview'){const Rg=pRange(rvU,rvO),c=pStats(Rg),rv=db.reviews[rvU+':'+Rg[0]]||{},lab=rvLab();
    const txt=[`# 履迹 · ${lab}回顾（${Rg[0]} ~ ${Rg[1]}）`,'',`- 投递 ${c.apps} 个，面试 ${c.iv} 场${c.offers.length?'，拿到 '+c.offers.join('、')+' 的 Offer':''}`,`- 记录 ${c.days} 天，学习 ${c.hours} 小时，专注 ${c.focus} 分钟${c.mood?'，平均心情 '+MOODS[Math.round(c.mood)-1]:''}`,`- 打卡：${db.habits.map(h=>h.name+' '+c.habits[h.id]+' 天').join('，')||'无'}`,'','## 做得好的',rv.good||'（未填写）','','## 需要改进的',rv.bad||'（未填写）','','## 下阶段计划',rv.next||'（未填写）'].join('\n');
