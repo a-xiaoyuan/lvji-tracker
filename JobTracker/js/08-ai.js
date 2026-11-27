@@ -195,8 +195,9 @@ function mockCard(){const L=db.mocks.slice().sort((x,y)=>y.at.localeCompare(x.at
 let INV=null;
 const looksInvite=t=>/面试|笔试|测评|宣讲|offer|邀请|视频面|[一二三四终复初]面|技术面|hr ?面|主管面|面一下|腾讯会议|飞书会议|会议号|zoom/i.test(t)&&/(\d{1,2}\s*[:：点]|\d{1,2}\s*月\s*\d{1,2}|\d{1,2}[/-]\d{1,2}|明天|后天|今天|下周|周[一二三四五六日天]|星期)/.test(t)&&t.length<4000;
 function classifyNotice(text,td){const t=String(text||'');const base=/^\d{4}-\d\d-\d\d$/.test(td||'')?td:today();let kind='unknown';
- if(/录用通知|拟录用|录用决定|offer|入职手续|恭喜.*(录用|通过.*面试)/i.test(t))kind='offer';
- else if(/很遗憾|未能通过|未通过本轮|没有通过|不(太)?匹配|未能进入|祝.*求职顺利/.test(t))kind='rejected';
+ const next=/邀请您?参加|下一轮|[二三四终复]面|复试/.test(t);
+ if(/很遗憾|未能通过|未通过本轮|没有通过|不(太)?匹配|未能进入|未能获得|祝.*求职顺利/.test(t))kind='rejected';
+ else if(!next&&/录用通知|拟录用|录用决定|决定录用|入职手续|offer\s*(letter|通知)|发放.{0,6}offer|正式\s*offer/i.test(t))kind='offer';
  else if(/笔试|测评|在线测试|编程测试/.test(t))kind='test';
  else if(/面试|视频面|邀请您参加|复试|终面/.test(t))kind='interview';
  let at='';const dm=(re,fn)=>{const m=t.match(re);if(m)at=fn(m);};
@@ -204,17 +205,19 @@ function classifyNotice(text,td){const t=String(text||'');const base=/^\d{4}-\d\
  if(!at)dm(/(\d{1,2})月(\d{1,2})日\s*(上午|下午|晚上)?\s*(\d{1,2})?[:：点]?(\d{2})?/,m=>{let h=m[4]?+m[4]:10;if((m[3]==='下午'||m[3]==='晚上')&&h<12)h+=12;if(m[3]==='上午'&&h===12)h=0;return base.slice(0,4)+'-'+String(m[1]).padStart(2,'0')+'-'+String(m[2]).padStart(2,'0')+'T'+String(h).padStart(2,'0')+':'+(m[5]||'00');});
  if(!at&&(kind==='interview'||kind==='test')){const rel=/后天/.test(t)?2:/明天/.test(t)?1:/今天|今晚/.test(t)?0:-1;if(rel>=0){const tm=t.match(/(上午|下午|晚上)?\s*(\d{1,2})[:：点](\d{2})?/);let h=tm?+tm[2]:10;if(tm&&(tm[1]==='下午'||tm[1]==='晚上')&&h<12)h+=12;at=dstr(new Date(new Date(base+'T00:00:00').getTime()+rel*864e5))+'T'+String(h).padStart(2,'0')+':'+(tm&&tm[3]?tm[3]:'00');}}
  return{kind,at};}
- function noticeApp(text){return db.apps.find(a=>a.company&&text.includes(a.company))||null;}
- let NOTICE=null;
-function openNotice(text=''){closeModal();aiModal('📥 粘贴通知入账','<p class="t2" style="margin:0 0 8px">把笔试 / 面试 / 录用 / 拒信的邮件或短信整段粘进来。先在本地认类型和时间（不联网），认出公司就自动建日程或更新状态；拿不准的再交给 AI。</p><textarea class="inp" id="ntT" rows="7" placeholder="粘贴通知全文…">'+esc(text)+'</textarea><div class="mfoot"><button class="btn" data-act="mclose">取消</button><button class="btn primary" data-act="noticego">识别入账</button></div>');}
+function noticeApp(text){return db.apps.find(a=>a.company&&text.includes(a.company))||null;}
+let NOTICE=null;
+function openNotice(text=''){closeModal();aiModal('📥 粘贴通知入账','<p class="t2" style="margin:0 0 8px">把笔试 / 面试 / 录用 / 拒信的邮件或短信整段粘进来。先在本地认类型和时间（不联网），认出公司就建日程；要改成「未通过」或「Offer」时会先问你。拿不准的再交给 AI。</p><textarea class="inp" id="ntT" rows="7" placeholder="粘贴通知全文…">'+esc(text)+'</textarea><div class="mfoot"><button class="btn" data-act="mclose">取消</button><button class="btn primary" data-act="noticego">识别入账</button></div>');}
 function noticeGo(){const t=(document.getElementById('ntT')?.value||'').trim();if(!t)return toast('先粘贴通知内容');const a=noticeApp(t);const c=classifyNotice(t);
  if(!a){if(c.kind==='interview'||c.kind==='test')return openInvite(t);return toast('没认出是哪家公司：先把这家公司加到履迹里，再粘贴一次');}
  if((c.kind==='interview'||c.kind==='test')){if(!c.at)return openInvite(t,a.id);const title=c.kind==='test'?'笔试 / 测评':'面试';if(a.events.some(e=>e.type===(c.kind==='test'?'test':'interview')&&e.at===c.at))return toast('这条日程已经建过了');
  a.events.push({id:uid(),type:c.kind==='test'?'test':'interview',title,at:c.at,place:'',done:false});if(c.kind==='interview'&&a.status==='applied')setStatus(a,'interview');touch(a);save();closeModal();openDrawer(a.id);return toast('已给 '+a.company+' 建好'+title+'日程：'+c.at.replace('T',' '),['🎯 备战',()=>openPrep(a.id)]);}
- if(c.kind==='rejected'){setStatus(a,'rejected');touch(a);save();closeModal();openDrawer(a.id);return toast(a.company+' 已标记为未通过，去记一下卡在哪一步吧');}
- if(c.kind==='offer'){setStatus(a,'offer');touch(a);save();closeModal();openDrawer(a.id);return toast('🎉 '+a.company+' 已标记为 Offer，去填 Offer 细节吧');}
+ if(c.kind==='rejected'||c.kind==='offer'){NOTICE={aid:a.id,kind:c.kind};const lab=c.kind==='offer'?'Offer':'未通过';
+  document.getElementById('aiBody').innerHTML=`<p style="margin:0 0 6px">认出这是 <b>${esc(a.company)}</b> 的${c.kind==='offer'?'录用通知':'拒信'}。确认后把这条投递改成「${lab}」。</p><div class="t2">认错了就点「不是」，状态不会变。</div><div class="mfoot"><button class="btn" data-act="notice">不是，重新粘贴</button><button class="btn primary" data-act="noticeok">确认改成「${lab}」</button></div>`;return;}
  openInvite(t,a.id);}
 
+function noticeOk(){const a=NOTICE&&appById(NOTICE.aid);if(!a)return closeModal();const k=NOTICE.kind;NOTICE=null;setStatus(a,k);touch(a);save();closeModal();openDrawer(a.id);
+ toast(k==='offer'?'🎉 '+a.company+' 已标记为 Offer，去填 Offer 细节吧':a.company+' 已标记为未通过，去记一下卡在哪一步吧');}
 function openInvite(text='',aid=''){closeModal();INV={aid,text,res:null};aiModal('📋 粘贴面试邀请',`<p class="t2" style="margin:0 0 8px">把 HR 发来的消息（微信、短信、邮件都行）整段粘进来，AI 会认出公司、时间、轮次和会议链接，帮你建好日程。</p><textarea class="inp" id="invT" rows="7" placeholder="如：您好，邀请您参加我司 Java 开发工程师岗位的二面，时间 11 月 28 日（周五）下午 2:30，腾讯会议 123-456-789……">${esc(text)}</textarea><div class="mfoot"><button class="btn" data-act="mclose">取消</button><button class="btn primary" data-act="invgo">识别</button></div>`);
  setTimeout(()=>document.getElementById('invT')?.focus(),30);}
 function invMatch(c){c=String(c||'').trim().toLowerCase();if(!c)return null;return db.apps.filter(a=>!['rejected','dropped'].includes(a.status)).find(a=>{const x=a.company.trim().toLowerCase();return x&&(x===c||x.includes(c)||c.includes(x));})||null;}

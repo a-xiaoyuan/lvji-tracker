@@ -317,6 +317,11 @@ test('classifyNotice：笔试、录用、拒信分得清', () => {
   assert.equal(CN.classifyNotice('恭喜您通过面试，我司决定录用，请于下周办理入职手续。', '2026-11-26').kind, 'offer');
   assert.equal(CN.classifyNotice('感谢您投递我司岗位。很遗憾，您未能通过本轮筛选，祝您求职顺利。', '2026-11-26').kind, 'rejected');
 });
+test('classifyNotice：拒信里提到 offer 不算录用；通过一面邀请下一轮算面试', () => {
+  assert.equal(CN.classifyNotice('很遗憾，您未能获得本次 offer，祝求职顺利', '2026-11-26').kind, 'rejected');
+  assert.equal(CN.classifyNotice('恭喜您通过初面！邀请您参加 11月28日 下午3点 的复试面试', '2026-11-26').kind, 'interview');
+  assert.equal(CN.classifyNotice('我们很高兴向您发放正式 offer，请查收附件中的 offer letter', '2026-11-26').kind, 'offer');
+});
 test('classifyNotice：相对日期（明天）也能算', () => {
   const c = CN.classifyNotice('请明天上午10点参加视频面试，提前 10 分钟进入会议', '2026-11-26');
   assert.equal(c.kind, 'interview');
