@@ -135,6 +135,8 @@ test('JD 红旗检测：收费和培训贷是高危，加班话术是提醒', ()
   assert.ok(warn.length >= 2 && warn.every(f => f.lv === 'warn'), JSON.stringify(warn));
   assert.equal(F.redFlags('负责后端服务开发，要求熟悉 Java 和 Spring Boot，有良好的编码习惯和团队协作能力，双休。').length, 0);
   assert.equal(F.redFlags('大小周').length, 0); // 太短不判断
+  // 常见的正常写法不算红旗
+  assert.equal(F.redFlags('入职体检费自理，公司实行弹性工作制，双休，负责后端服务开发和维护，熟悉 Java。').length, 0);
 });
 
 test('海报数据和吉祥物阶段', () => {
