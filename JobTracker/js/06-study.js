@@ -105,6 +105,28 @@ function drawPoster(S){const cv=document.getElementById('posterCv');if(!cv)retur
  const lines=S.ms.length?S.ms.map(m=>`${m.d}  ${m.t}`):['（去「回顾与历程」里记下你的第一个里程碑）'];
  lines.forEach((t,i)=>g.fillText(t.slice(0,25),56,780+i*48));
  g.fillStyle='#8f89ad';g.font=F(400,24);g.fillText(`履迹 · ${today()}`,56,1024);}
+/* ---------------- 数据四件套：话术效果 / 人脉雷达 / 时机洞察 / 海投疲劳 ---------------- */
+function appReplied(a){return !['wish','applied','rejected'].includes(a.status)||(a.events||[]).some(e=>e.type==='interview'||e.type==='test'||e.done);}
+function tplStats(apps,tpls){const M={};for(const a of apps||[])for(const u of a.tplUse||[]){const r=M[u.tpl]=M[u.tpl]||{used:0,replied:0};r.used++;if(appReplied(a))r.replied++;}
+ return (tpls||[]).map(t=>({id:t.id,title:t.title,...(M[t.id]||{used:0,replied:0})})).filter(x=>x.used>0).sort((a,b)=>b.used-a.used);}
+function tplStatsCard(){const S=tplStats(db.apps,db.tpls);if(!S.length)return '';
+ return `<div class="card sec" style="margin-top:16px"><h3>话术效果<span class="m">在投递详情里复制话术会自动记一笔</span></h3>${S.map(x=>`<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line)"><span style="flex:1">${esc(x.title)}</span><span class="t2">用了 ${x.used} 次</span><b>${Math.round(x.replied/x.used*100)}% 回复</b></div>`).join('')}</div>`;}
+function peopleNamesFor(company,people){const c=String(company||'').replace(/\s/g,'');if(c.length<2)return [];
+ return (people||[]).filter(p=>{const pc=String(p.company||'').replace(/\s/g,'');return pc.length>=2&&(c.includes(pc)||pc.includes(c));}).map(p=>p.name);}
+function jobInsights(apps){const out=[],WD=['周日','周一','周二','周三','周四','周五','周六'];
+ const byW={};for(const a of apps||[]){if(!a.appliedAt)continue;const w=new Date(a.appliedAt+'T00:00:00').getDay();const r=byW[w]=byW[w]||{n:0,rep:0};r.n++;if(appReplied(a))r.rep++;}
+ const cand=Object.entries(byW).filter(([,v])=>v.n>=5).sort((x,y)=>y[1].rep/y[1].n-x[1].rep/x[1].n);
+ if(cand.length&&cand[0][1].rep>0)out.push(`你${WD[cand[0][0]]}投的岗位回复率最高（${Math.round(cand[0][1].rep/cand[0][1].n*100)}%，${cand[0][1].n} 次投递）`);
+ const byC={};for(const a of apps||[]){if(!a.appliedAt)continue;const e=(a.events||[]).filter(x=>(x.type==='interview'||x.type==='test')&&x.at).sort((x,y)=>x.at<y.at?-1:1)[0];if(!e)continue;const d=Math.round((new Date(e.at.slice(0,10)+'T00:00:00')-new Date(a.appliedAt+'T00:00:00'))/864e5);if(d<0||d>60)continue;const r=byC[a.channel]=byC[a.channel]||{n:0,sum:0};r.n++;r.sum+=d;}
+ const cc=Object.entries(byC).filter(([,v])=>v.n>=3).sort((x,y)=>x[1].sum/x[1].n-y[1].sum/y[1].n);
+ if(cc.length)out.push(`${cc[0][0]}回复最快，平均 ${(cc[0][1].sum/cc[0][1].n).toFixed(1)} 天就约面（${cc[0][1].n} 次）`);
+ return out.slice(0,2);}
+function insightsCard(){const L=jobInsights(db.apps);if(!L.length)return '';
+ return `<div class="card sec" style="margin-top:16px"><h3>数据洞察<span class="m">从你自己的记录里算出来的</span></h3>${L.map(x=>`<div style="padding:4px 0">💡 ${esc(x)}</div>`).join('')}</div>`;}
+function fatigueTip(apps){const t0=today();
+ const recent=(apps||[]).filter(a=>a.appliedAt&&dayDiff(t0,a.appliedAt)>=0&&dayDiff(t0,a.appliedAt)<=2).length;
+ const progress=(apps||[]).some(a=>a.appliedAt&&dayDiff(t0,a.appliedAt)<=14&&appReplied(a));
+ return recent>=6&&!progress?'这几天投了不少，但还没等来回复——今天别再海投了，去复盘一轮题目或者改一版简历，节奏比数量重要。':'';}
 function milestones(){const L=[{d:huntStart(),e:'🚀',t:'开始求职'}];
  const sent=db.apps.filter(a=>a.status!=='wish'&&a.appliedAt).sort((a,b)=>a.appliedAt.localeCompare(b.appliedAt));
  if(sent[0])L.push({d:sent[0].appliedAt,e:'📮',t:'第一次投递：'+sent[0].company});

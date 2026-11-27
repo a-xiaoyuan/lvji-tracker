@@ -133,6 +133,7 @@ function vDash(){
    ${up.length?up.map(({a,e})=>`<div class="ev-row" data-open="${a.id}">${whenBox(e.at)}<div style="flex:1;min-width:0"><div class="t1">${esc(a.company)} · ${esc(e.title||EV[e.type])} ${clashTag(e,a)}</div><div class="t2">${esc(a.role)} · ${EV[e.type]} · ${+e.at.slice(5,7)}月${+e.at.slice(8,10)}日 ${e.at.slice(11,16)}${e.place?' · '+esc(e.place):''}</div></div>${(e.type==='interview'||e.type==='test')?`<button class="btn sm" data-act="prep" data-a="${a.id}" data-e="${e.id}" title="面试备战卡">🎯 准备</button>`:''}${/^https?:/.test(e.place||'')?ext(safeUrl(e.place),'进入会议','btn sm'):stTag(a.status)}</div>`).join(''):'<div class="empty">没有即将到来的笔试或面试。在投递详情里可以添加日程。</div>'}
   </div>
   <div class="card sec"><h3>✅ 待办提醒</h3>
+   ${(t=>t?`<div class="alert">🌿 ${esc(t)}<span style="flex:1"></span><button class="btn sm" data-view="bank">去复盘题目</button></div>`:'')(fatigueTip(db.apps))}
    ${review.map(({a,e})=>`<div class="alert" data-open="${a.id}">📝 ${esc(a.company)} 的「${esc(e.title||'面试')}」还没写复盘，趁记忆清楚补一下<span style="flex:1"></span><button class="btn sm" data-act="rvopen" data-a="${a.id}" data-e="${e.id}">📝 3 步复盘</button></div>`).join('')}
    ${IVS.L.map(({a,e,days})=>`<div class="alert" data-open="${a.id}">⏳ ${esc(a.company)} ${esc(e.title||EV[e.type])}后 ${days} 天没消息<span class="t2">（${IVS.S?`你的面试一般 ${IVS.S.med} 天内就有下文`:'一般一周内会有下文'}，可以问一下进度）</span><span style="flex:1"></span><button class="btn sm" data-act="ivmsg" data-a="${a.id}">✨ AI 问进度</button><button class="btn sm ghost" data-act="snooze" data-a="${a.id}" title="7 天后再提醒">再等等</button><button class="btn sm ghost" data-act="ivdead" data-a="${a.id}" title="移到「未通过」">没戏了</button></div>`).join('')}
    ${duePeople().map(p=>`<div class="alert" data-view="people">🤝 该联系 <b>${esc(p.name)}</b>${p.company?'（'+esc(p.company)+'）':''} 了${p.notes?' · '+esc(p.notes.slice(0,30)):''}</div>`).join('')}
@@ -148,12 +149,12 @@ function vDash(){
  </div>
  <div class="card sec" style="margin-top:16px"><h3>渠道效果<span class="m">投递数 · 回复率 · 一般几天回</span></h3>
   ${chs.length?chs.map(x=>`<div class="chl w"><span>${x.c}</span><div class="bar"><i style="width:${x.n/cmax*100}%"></i></div><span class="r">${x.n} 个 · ${Math.round(x.r/x.n*100)}%${RS[x.c]?` · 约 ${RS[x.c].med} 天`:''}</span></div>`).join(''):'<div class="empty">还没有已投递的记录</div>'}
- </div>`;
+ </div>${insightsCard()}`;
 }
 function dueTag(a){if(!a.due||a.status!=='wish')return '';const d=dayDiff(a.due,today());return `<span class="tag" style="${d<=3?'background:#ff2d8718;color:var(--bad);font-weight:600':''}">⏳ ${d<0?'已截止':d===0?'今天截止':a.due.slice(5).replace('-','/')+' 截止'}</span>`;}
 function kcard(a){
- const ne=nextEvent(a),p=PRI[a.priority]||PRI[2],link=safeUrl(a.link)||safeUrl(a.site);
- return `<div class="kc" draggable="true" data-id="${a.id}" data-open="${a.id}" style="--n:${_n++}"><div class="co"><span class="dot" style="background:${p[1]}" title="优先级${p[0]}"></span>${esc(a.company)||'未命名公司'}${link?`<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="打开${safeUrl(a.link)?'岗位链接':'公司官网'}">↗</a>`:''}</div><div class="ro">${esc(a.role)||'—'}</div>
+ const ne=nextEvent(a),p=PRI[a.priority]||PRI[2],link=safeUrl(a.link)||safeUrl(a.site),radar=peopleNamesFor(a.company,db.people);
+ return `<div class="kc" draggable="true" data-id="${a.id}" data-open="${a.id}" style="--n:${_n++}"><div class="co"><span class="dot" style="background:${p[1]}" title="优先级${p[0]}"></span>${esc(a.company)||'未命名公司'}${radar.length?`<span class="tag" title="这家你有人脉，去人脉页找他打个招呼">🤝 ${esc(radar[0])}${radar.length>1?' 等'+radar.length+'人':''}</span>`:''}${link?`<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="打开${safeUrl(a.link)?'岗位链接':'公司官网'}">↗</a>`:''}</div><div class="ro">${esc(a.role)||'—'}</div>
  <div class="meta">${a.city?`<span class="tag">📍${esc(a.city)}</span>`:''}${a.salary?`<span class="tag">💰${esc(a.salary)}</span>`:''}${ne?`<span class="tag" style="background:var(--accent-soft);color:var(--accent)">⏰ ${ne.at.slice(5,10).replace('-','/')} ${ne.at.slice(11,16)} ${EV[ne.type]}</span>`:''}${dueTag(a)}${a.status==='offer'&&annual(a.offer)?`<span class="tag" style="color:var(--ok)">年包 ${fmtK(annual(a.offer))}</span>`:''}</div></div>`;
 }
 let _n=0;
