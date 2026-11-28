@@ -15,10 +15,10 @@ function render(){try{renderInner();}catch(err){console.error(err);const v=docum
 function renderInner(){
  const upcoming=allEvents().filter(({e})=>!e.done&&e.at&&e.at.slice(0,10)>=today()).length;
  const cnt={agent:agentAlerts(AG.d,Date.now()).length,people:db.people.filter(p=>p.nextAt&&p.nextAt<=today()).length,list:db.apps.length,cal:upcoming,offer:db.apps.filter(a=>a.status==='offer').length,bank:allQuestions().filter(x=>db.qmark[x.h]!=='ok').length};
- document.getElementById('nav').innerHTML=VIEWS.filter(([k])=>k!=='agent'||agShow()||view==='agent').map(([k,n])=>({dash:'<div class="navg">求职</div>',resume:'<div class="navg">我自己</div>',agent:'<div class="navg">工具</div>',settings:'<div class="navg"></div>'}[k]||'')+`<button data-view="${k}" title="${n}" class="${view===k?'on':''}">${svg(k)}${n}${cnt[k]?`<span class="cnt">${cnt[k]}</span>`:''}</button>`).join('');
+ document.getElementById('nav').innerHTML=navHtml(cnt);
  const [t,s]={dash:['概览',greet()],board:['看板','拖动卡片即可更新进度'],list:['全部投递',`共 ${db.apps.length} 条记录`],cal:['面试日程','所有笔试、面试与跟进安排'],offer:['Offer 对比','按年包、成长和生活平衡综合比较'],bank:['面试题库','面试里被问到的题，点一下就能去练'],tpl:['话术模板','打招呼、内推、跟进、感谢信，一键填好公司和岗位后复制'],resume:['我的简历',''],review:['回顾与历程','看看这段时间的自己：数据、心情、复盘和里程碑'],journal:['成长日记','每天一分钟，记下努力的自己'],skills:['能力树','会什么、差什么、先补什么'],stories:['面试故事库','用 STAR 法则准备行为面试，被问到时不慌'],people:['人脉','帮过你、能帮你的人，到时间提醒你联系'],agent:['Agent 额度','各个 AI 编程助手的额度和用量，数据只在本机读取'],settings:['设置与备份','数据安全、提醒和偏好']}[view];
  document.getElementById('title').textContent=t;document.getElementById('subtitle').textContent=s;
- document.getElementById('topAdd').hidden=!['dash','board','list','cal'].includes(view);if(view==='settings'){setTimeout(aiStatusFill,50);setTimeout(extStatusFill,60);} // 只在求职相关页面显示添加按钮
+ document.getElementById('topAdd').hidden=!['dash','board','list','cal'].includes(view);if(view==='settings'){setTimeout(aiStatusFill,50);setTimeout(extStatusFill,60);setTimeout(phoneFill,70);setTimeout(mailFill,80);} // 只在求职相关页面显示添加按钮
  const v=document.getElementById('view');
  const entering=view!==lastView;lastView=view;
  const full=view==='resume';document.querySelector('main').classList.toggle('full',full);document.querySelector('.app').classList.toggle('mini',full);if(full){showRuye();return;}
@@ -55,20 +55,28 @@ async function showRuye(){
 function huntStart(){return db.settings.startDate||db.apps.map(a=>a.appliedAt).filter(Boolean).sort()[0]||today();}
 function huntDays(){return Math.max(1,dayDiff(today(),huntStart())+1);}
 function todayCard(){const td=today(),tm=dstr(new Date(Date.now()+864e5)),now=nowLocal(),I=[];
+ const reviewN=allQuestions().filter(x=>!x.dup&&db.qmark[x.h]!=='ok'&&(!db.qsrs[x.h]||db.qsrs[x.h].due<=td)).length;
+ const Q=buildTodayQueue(db.apps,td,tm,replyStats(),reviewN),ST=Q.filter(x=>x.kind==='stale');
+ for(const x of Q){
+  if(x.kind==='due')I.push({ic:'⏳',t:`<b>${esc(x.company)}</b> · ${esc(x.role)} <span class="t2">${x.what==='offer'?'Offer '+(x.days===0?'今天':x.days+' 天后')+'截止答复':(x.days<0?'投递已过期 '+(-x.days)+' 天':x.days===0?'今天截止投递':x.days+' 天后截止投递')}</span>`,open:x.app,k:-1});
+  else if(x.kind==='prep')I.push({ic:x.etype==='test'?'📝':'🎤',t:`明天 ${esc(x.at.slice(11,16))} ${esc(x.company)} · ${esc(x.title||(x.etype==='test'?'笔试':'面试'))}`,open:x.app,btn:`<button class="btn sm" data-act="prep" data-a="${x.app}" data-e="${x.event}">🎯 备战</button>`,k:1});
+  else if(x.kind==='review')I.push({ic:'🎴',t:`${x.n} 道面试题该复习了`,btn:'<button class="btn sm" data-act="review">开始复习</button>',k:2});}
  for(const {a,e} of allEvents()){if(!e.at)continue;const d=e.at.slice(0,10);
-  if(d===td)I.push({ic:e.type==='interview'?'🎤':e.type==='test'?'📝':'📌',t:`${e.at.slice(11,16)} ${esc(a.company)} · ${esc(e.title||EV[e.type])}`,done:e.done||(e.type!=='interview'&&e.type!=='test'&&e.at<now),open:a.id,btn:(e.type==='interview'||e.type==='test')&&!e.done?`<button class="btn sm" data-act="prep" data-a="${a.id}" data-e="${e.id}">🎯 备战</button>`:'',k:0});}
+  if(d===td&&e.type!=='reply')I.push({ic:e.type==='interview'?'🎤':e.type==='test'?'📝':'📌',t:`${e.at.slice(11,16)} ${esc(a.company)} · ${esc(e.title||EV[e.type])}`,done:e.done||(e.type!=='interview'&&e.type!=='test'&&e.at<now),open:a.id,btn:(e.type==='interview'||e.type==='test')&&!e.done?`<button class="btn sm" data-act="prep" data-a="${a.id}" data-e="${e.id}">🎯 备战</button>`:'',k:0});}
  const goal=+db.settings.weekGoal||0;if(goal){const ws=weekStart(),sent=db.apps.filter(a=>a.status!=='wish'&&a.appliedAt&&new Date(a.appliedAt+'T00:00')>=ws),left=goal-sent.length,days=7-dayDiff(td,dstr(ws)),tn=db.apps.filter(a=>a.status!=='wish'&&a.appliedAt===td).length;
   if(left>0||tn){const need=Math.max(0,Math.ceil(Math.max(0,left+tn)/Math.max(1,days)));if(need||tn)I.push({ic:'📮',t:tn>=need?`今天已投 ${tn} 个，达标了${left>0?`（本周还差 ${left} 个）`:'，本周目标也完成了'}`:`今天目标投 ${need} 个，已投 ${tn} 个（本周还差 ${left} 个）`,done:tn>=need,btn:tn<need?`<button class="btn sm" data-act="add">＋ 记一个</button>`:'',k:3});}}
  if(db.settings.lcUser&&db.lc){const T=lcToday(),L=db.lc;I.push({ic:'🧩',t:T.ac.length?`今天力扣已通过 ${T.ac.length} 题${T.dailyDone?'，每日一题也做了':''}`:`今天还没刷力扣${L.daily?` · 每日一题「${esc(L.daily.title)}」${LC_DN[L.daily.difficulty]||''}`:''}`,done:T.ac.length>0,btn:T.ac.length||!L.daily?'':ext(lcLink(L.daily.slug),'去做 ↗'),k:4});}
  const dp=duePeople().length;if(dp)I.push({ic:'🤝',t:`${dp} 位联系人该跟进了`,view:'people',k:5});
  I.push({ic:'📓',t:'写一句今天的日记，记下努力的自己',done:jActive(td),view:'journal',k:6});
  const n=I.filter(x=>x.done).length;
- return `<div class="card sec today"><h3>☀️ 今天该做什么<span class="m">${n}/${I.length} 完成</span></h3><div class="tbar"><i style="width:${I.length?n/I.length*100:0}%"></i></div>
- ${I.sort((x,y)=>(x.done-y.done)||(x.k-y.k)).map(x=>`<div class="ti ${x.done?'done':''}" ${x.open?`data-open="${x.open}"`:x.view?`data-view="${x.view}"`:''}><span class="tic">${x.done?'✓':x.ic}</span><span class="tt">${x.t}</span>${x.btn||''}</div>`).join('')}</div>`;}
+ const srow=x=>`<div class="ti" data-open="${x.app}"${x.med?` title="${esc(x.channel)}通常 ${x.med} 天内有回音"`:''}><span class="tic">📨</span><span class="tt"><b>${esc(x.company)}</b> · ${esc(x.role)} <span class="t2">${x.days} 天没动静</span></span>${db.tpls.find(t=>t.id==='t3')?`<button class="btn sm" data-act="followcopy" data-a="${x.app}">📋 跟进话术</button>`:''}<button class="btn sm ghost" data-act="qfollow" data-a="${x.app}" title="已经用别的方式跟进过了">已跟进</button><button class="btn sm ghost" data-act="snooze" data-a="${x.app}" title="7 天后再提醒">再等等</button><button class="btn sm ghost" data-act="ghosted" data-a="${x.app}" title="移到「未通过」">没戏了</button></div>`;
+ return `<div class="card sec today"><h3>☀️ 今天要做的<span class="m">${n}/${I.length} 完成</span></h3>
+ ${I.sort((x,y)=>(x.done-y.done)||(x.k-y.k)).map(x=>`<div class="ti ${x.done?'done':''}" ${x.open?`data-open="${x.open}"`:x.view?`data-view="${x.view}"`:''}><span class="tic">${x.done?'✓':x.ic}</span><span class="tt">${x.t}</span>${x.btn||''}</div>`).join('')}
+ ${ST.length?`<div class="tsub">📨 ${ST.length} 家投递很久没回音 <span class="t2">跟进一下，或者放下</span></div>${ST.slice(0,3).map(srow).join('')}${ST.length>3?`<details class="tmore"><summary>还有 ${ST.length-3} 家</summary>${ST.slice(3).map(srow).join('')}</details>`:''}`:''}</div>`;}
 function duePeople(){return db.people.filter(p=>p.nextAt&&p.nextAt<=today());}
-function meCard(){const P=db.settings.profile||{},st=streak();
+function meCard(){const P=db.settings.profile||{},st=streak(),M=db.apps.length?mascotStage(db.apps):null;
  return `<div class="card me"><img src="avatar.png" alt="" onerror="this.remove()"><div style="flex:1;min-width:0"><div class="t1" style="font-size:16px">${esc(P.name||'我')} · 求职第 ${huntDays()} 天${st?` · 🔥 连续记录 ${st} 天`:''}</div>
- <div class="t2">${P.target?'目标：'+esc(P.target):'还没写下目标，点右边「编辑」写一个吧'}${P.cities?' · '+esc(P.cities):''}${P.salary?' · 期望 '+esc(P.salary):''}</div>${P.motto?`<div style="margin-top:4px;font-style:italic">“${esc(P.motto)}”</div>`:''}</div>
+ <div class="t2">${P.target?'目标：'+esc(P.target):'还没写下目标，点右边「编辑」写一个吧'}${P.cities?' · '+esc(P.cities):''}${P.salary?' · 期望 '+esc(P.salary):''}</div>${P.motto?`<div style="margin-top:4px;font-style:italic">“${esc(P.motto)}”</div>`:''}${M?`<div class="t2" style="margin-top:4px">${M.e} ${esc(M.t)}</div>`:''}</div>
  ${jActive(today())?'<span class="tag" style="color:var(--ok)">✓ 今天已记录</span>':'<button class="btn sm primary" data-view="journal">✎ 写今天的日记</button>'}<button class="btn sm" data-act="chat">💬 问 AI 教练</button><button class="btn sm" data-act="editme">编辑</button></div>`;}
 function greet(){const h=new Date().getHours(),d=new Date();return `${h<11?'早上好':h<14?'中午好':h<18?'下午好':'晚上好'}，今天是 ${d.getMonth()+1} 月 ${d.getDate()} 日 星期${WK[d.getDay()]}`;}
 function vEmpty(){return `<div class="card hero" style="padding:36px 30px;margin-bottom:16px"><div style="font-size:44px">🗂️</div><h2>开始记录你的求职之路</h2><p>投递、笔试、面试、复盘、Offer，全部放在一个地方。数据只保存在你自己的电脑上。</p>
@@ -83,18 +91,6 @@ function mascotStage(apps){const A=apps||[];
  if(A.some(a=>['interview','hr'].includes(a.status)||(a.events||[]).some(e=>e.type==='interview'&&!e.done)))return {e:'👔',t:'面试期：穿正装的是我，稳稳答题的也是我。'};
  if(A.some(a=>a.status!=='wish'))return {e:'🏃',t:'投递进行中，回复在路上，别停。'};
  return {e:'🌱',t:'求职季开始啦，先把心愿单填满。'};}
-function mascotHtml(){const M=mascotStage(db.apps);
- return `<div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:16px"><div style="font-size:44px;line-height:1">${M.e}</div><div><div class="t1">履迹小伙伴</div><div class="t2">${esc(M.t)}</div></div></div>`;}
-function todayQueueCard(){
- const td=today(),tm=dstr(new Date(Date.now()+864e5)),RS=replyStats();
- const reviewN=allQuestions().filter(x=>!x.dup&&db.qmark[x.h]!=='ok'&&(!db.qsrs[x.h]||db.qsrs[x.h].due<=td)).length;
- const Q=buildTodayQueue(db.apps,td,tm,RS,reviewN),show=Q.slice(0,10);
- const row=x=>{
-  if(x.kind==='due')return `<div class="alert" data-open="${x.app}">⏳ <b>${esc(x.company)}</b> · ${esc(x.role)} ${x.what==='offer'?'Offer '+(x.days===0?'今天':x.days+' 天后')+'截止答复':(x.days<0?'投递已过期 '+(-x.days)+' 天':x.days===0?'今天截止投递':x.days+' 天后截止投递')}<span style="flex:1"></span></div>`;
-  if(x.kind==='prep')return `<div class="alert" data-open="${x.app}">${x.etype==='test'?'📝':'🎤'} <b>${esc(x.company)}</b> · ${esc(x.title||(x.etype==='test'?'笔试':'面试'))} 明天 ${esc(x.at.slice(11,16))}<span style="flex:1"></span><button class="btn sm" data-act="prep" data-a="${x.app}" data-e="${x.event}">🎯 备战</button></div>`;
-  if(x.kind==='stale')return `<div class="alert" data-open="${x.app}">📨 <b>${esc(x.company)}</b> · ${esc(x.role)} 投递 ${x.days} 天没动静${x.med?`<span class="t2">（${esc(x.channel)}通常 ${x.med} 天内有回音）</span>`:''}<span style="flex:1"></span>${db.tpls.find(t=>t.id==='t3')?`<button class="btn sm" data-act="followcopy" data-a="${x.app}">📋 复制跟进话术</button>`:''}<button class="btn sm ghost" data-act="qfollow" data-a="${x.app}" title="已经用别的方式跟进过了">已跟进</button><button class="btn sm ghost" data-act="snooze" data-a="${x.app}" title="7 天后再提醒">再等等</button><button class="btn sm ghost" data-act="ghosted" data-a="${x.app}" title="移到「未通过」">没戏了</button></div>`;
-  return `<div class="alert">🎴 今天有 <b>${x.n}</b> 道面试题该复习<span style="flex:1"></span><button class="btn sm" data-act="review">开始复习</button></div>`;};
- return `<div class="card sec" style="margin-bottom:16px"><h3>⚡ 今日行动队列<span class="m">按紧急程度排</span></h3>${show.length?show.map(row).join(''):'<div class="empty">今天没有要紧的事，按自己的节奏来 🎉</div>'}${Q.length>show.length?`<div class="t2" style="margin-top:6px">还有 ${Q.length-show.length} 条排在后面，先处理上面这些。</div>`:''}</div>`;}
 function subCard(){if(!(db.subs||[]).length)return '';return `<div class="card"><h3>📌 岗位订阅<span class="sp"></span><span class="t2">${db.subs.length} 个 · 只给你看没见过的新岗位，带匹配分</span></h3><label class="t2" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" data-act="subauto" ${db.settings.subAuto?'checked':''}>打开履迹时自动扫描到期的订阅（每个订阅一天最多一次；会联网调用 AI，消耗额度）</label>${db.subs.map(s2=>`<div class="alert ${!s2.lastRun||Date.now()-s2.lastRun>864e5?'warn':''}" style="margin-top:8px"><span style="flex:1">${esc(s2.role||'不限岗位')}${s2.city?' · '+esc(s2.city):''} <span class="t2">${s2.lastRun?'上次扫描 '+new Date(s2.lastRun).toLocaleDateString():'还没扫过'}</span></span><button class="btn sm" data-act="subdel" data-a="${s2.id}">删除</button><button class="btn sm primary" data-act="subscan" data-a="${s2.id}">扫描新岗位</button></div>`).join('')}</div>`;}
 function vDash(){
  const A=db.apps,sent=A.filter(a=>a.status!=='wish');
@@ -119,7 +115,7 @@ function vDash(){
  const chs=CH.map(c=>{const L=sent.filter(a=>a.channel===c);return{c,n:L.length,r:L.filter(a=>responded.includes(a)).length};}).filter(x=>x.n).sort((a,b)=>b.n-a.n);
  const cmax=Math.max(1,...chs.map(x=>x.n));
  const hasSample=A.some(a=>a.sample);
- return `${todayQueueCard()}${meCard()}${A.length?mascotHtml():''}${A.length?todayCard():vEmpty()}${lcCard()}${subCard()}
+ return `${meCard()}${mailCard()}${A.length?weekCard()+todayCard():vEmpty()}${lcCard()}${subCard()}
  ${hasSample?`<div class="alert info">ℹ️ 当前包含示例数据，熟悉后可以<a href="#" data-act="clearsample" style="margin-left:4px">一键清除示例</a></div>`:''}
  ${goal?`<div class="card goal"><div><div class="t1">本周投递目标</div><div class="t2">${weekN>=goal?'🎉 已完成，继续保持':'还差 '+(goal-weekN)+' 个'}</div></div><div class="bar"><i style="width:${Math.min(100,weekN/goal*100)}%"></i></div><div class="big">${weekN}<span class="t2"> / ${goal}</span></div><button class="btn sm ghost" data-view="settings">调整</button></div>`:''}
  <div class="grid kpis">
@@ -150,24 +146,24 @@ function vDash(){
  </div>
  <div class="card sec" style="margin-top:16px"><h3>渠道效果<span class="m">投递数 · 回复率 · 一般几天回</span></h3>
   ${chs.length?chs.map(x=>`<div class="chl w"><span>${x.c}</span><div class="bar"><i style="width:${x.n/cmax*100}%"></i></div><span class="r">${x.n} 个 · ${Math.round(x.r/x.n*100)}%${RS[x.c]?` · 约 ${RS[x.c].med} 天`:''}</span></div>`).join(''):'<div class="empty">还没有已投递的记录</div>'}
- </div>${insightsCard()}`;
+ </div>${timingCard()}`;
 }
 function dueTag(a){if(!a.due||a.status!=='wish')return '';const d=dayDiff(a.due,today());return `<span class="tag" style="${d<=3?'background:#ff2d8718;color:var(--bad);font-weight:600':''}">⏳ ${d<0?'已截止':d===0?'今天截止':a.due.slice(5).replace('-','/')+' 截止'}</span>`;}
 function kcard(a){
  const ne=nextEvent(a),p=PRI[a.priority]||PRI[2],link=safeUrl(a.link)||safeUrl(a.site),radar=peopleNamesFor(a.company,db.people);
- return `<div class="kc" draggable="true" data-id="${a.id}" data-open="${a.id}" style="--n:${_n++}"><div class="co"><span class="dot" style="background:${p[1]}" title="优先级${p[0]}"></span>${esc(a.company)||'未命名公司'}${radar.length?`<span class="tag" title="这家你有人脉，去人脉页找他打个招呼">🤝 ${esc(radar[0])}${radar.length>1?' 等'+radar.length+'人':''}</span>`:''}${link?`<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="打开${safeUrl(a.link)?'岗位链接':'公司官网'}">↗</a>`:''}</div><div class="ro">${esc(a.role)||'—'}</div>
- <div class="meta">${a.city?`<span class="tag">📍${esc(a.city)}</span>`:''}${a.salary?`<span class="tag">💰${esc(a.salary)}</span>`:''}${ne?`<span class="tag" style="background:var(--accent-soft);color:var(--accent)">⏰ ${ne.at.slice(5,10).replace('-','/')} ${ne.at.slice(11,16)} ${EV[ne.type]}</span>`:''}${dueTag(a)}${a.status==='offer'&&annual(a.offer)?`<span class="tag" style="color:var(--ok)">年包 ${fmtK(annual(a.offer))}</span>`:''}</div></div>`;
+ return `<div class="kc" draggable="true" data-id="${a.id}" data-open="${a.id}" style="--n:${_n++}"><div class="co"><span class="dot" style="background:${p[1]}" title="优先级${p[0]}"></span>${esc(a.company)||'未命名公司'}${radar.length?`<span class="tag" title="这家你有人脉，去人脉页找他打个招呼">🤝 ${esc(radar[0])}${radar.length>1?' 等'+radar.length+'人':''}</span>`:''}${link?`<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="打开${safeUrl(a.link)?'岗位链接':'公司官网'}">↗</a>`:''}</div><div class="ro">${esc(a.role)||'—'}${a.city?' · '+esc(a.city):''}${a.salary?' · '+esc(a.salary):''}</div>
+ <div class="meta">${ne?`<span class="tag" style="background:var(--accent-soft);color:var(--accent)">⏰ ${ne.at.slice(5,10).replace('-','/')} ${ne.at.slice(11,16)} ${EV[ne.type]}</span>`:''}${dueTag(a)}${a.status==='offer'&&annual(a.offer)?`<span class="tag" style="color:var(--ok)">年包 ${fmtK(annual(a.offer))}</span>`:''}</div></div>`;
 }
 let _n=0;
+let BLIM={};const BSTEP=20; // 看板每列先显示 20 条，投递很多时页面不会被一长串卡片撑满
 let FOLD=(()=>{try{return JSON.parse(localStorage.getItem('jt_fold'))||{rejected:1,dropped:1};}catch{return {rejected:1,dropped:1};}})();
 function vBoard(){_n=0;return `<div class="board">${ST.map(s=>{const L=db.apps.filter(a=>a.status===s.k).sort((a,b)=>(a.priority-b.priority)||(b.updatedAt-a.updatedAt));
- // 收起的列、以及空着的列（待投递除外）都显示成窄条，省出地方给有卡片的列；窄条照样可以把卡片拖进去
- if(FOLD[s.k])return `<div class="col fold" data-col="${s.k}" data-act="fold" data-k="${s.k}" title="点开查看${s.n}（也可以把卡片拖到这里）"><span class="dot" style="background:${s.c}"></span><b>${s.n}</b><span class="c">${L.length}</span></div>`;
- if(!L.length&&s.k!=='wish')return `<div class="col fold empty" data-col="${s.k}" title="${s.n}：暂时没有，可以把卡片拖到这里"><span class="dot" style="background:${s.c}"></span><b>${s.n}</b><span class="c">0</span></div>`;
- return `<div class="col" data-col="${s.k}"><h4><span class="dot" style="background:${s.c}"></span>${s.n}<span class="c">${L.length}</span><button class="foldbtn" data-act="fold" data-k="${s.k}" title="收起这一列">⟨</button></h4>${L.map(kcard).join('')}${s.k==='wish'?'<button class="btn sm ghost" data-act="add" data-st="wish" style="width:100%;justify-content:center">＋ 添加</button>':''}</div>`;}).join('')}</div>`;}
+ // 只有自己点「收起」的列才显示成窄条；空着的列照常显示，方便看清每一步、把卡片拖进去
+ if(FOLD[s.k])return `<div class="col fold" data-col="${s.k}" data-act="fold" data-k="${s.k}" title="点开查看${s.n}（也可以把卡片拖到这里）"><span class="dot" style="background:${s.c}"></span><b>${s.n}</b><span class="c">${L.length}</span><span class="op">点开</span></div>`;
+ return `<div class="col" data-col="${s.k}"><h4><span class="dot" style="background:${s.c}"></span>${s.n}<span class="c">${L.length}</span><button class="foldbtn" data-act="fold" data-k="${s.k}" title="收起这一列">⟨</button></h4>${L.length?L.slice(0,BLIM[s.k]||BSTEP).map(kcard).join(''):s.k==='wish'?'':'<div class="colempty">还没有<br>可以把卡片拖到这里</div>'}${L.length>(BLIM[s.k]||BSTEP)?`<div class="colmore"><span>还有 ${L.length-(BLIM[s.k]||BSTEP)} 条没显示</span><button class="btn sm ghost" data-act="colmore" data-k="${s.k}">再显示 ${Math.min(BSTEP,L.length-(BLIM[s.k]||BSTEP))} 条</button><button class="btn sm ghost" data-act="colall" data-k="${s.k}">在列表里看全部 →</button></div>`:''}${s.k==='wish'?'<button class="btn sm ghost" data-act="add" data-st="wish" style="width:100%;justify-content:center">＋ 添加</button>':''}</div>`;}).join('')}</div>`;}
 let LIST_LIM=200; // 记录很多时先显示 200 条，点「显示更多」再加载，页面不卡
 function vList(){
- let L=db.apps.filter(a=>(!F.status||a.status===F.status)&&(!F.channel||a.channel===F.channel)&&(!F.q||[a.company,a.role,a.city,a.notes,a.resume].join(' ').toLowerCase().includes(F.q.toLowerCase())));
+ let L=listFilter();const allSel=L.length>0&&L.every(a=>SEL.has(a.id));
  const so={updated:(a,b)=>b.updatedAt-a.updatedAt,applied:(a,b)=>(b.appliedAt||'').localeCompare(a.appliedAt||''),company:(a,b)=>a.company.localeCompare(b.company,'zh'),priority:(a,b)=>a.priority-b.priority,status:(a,b)=>ST.findIndex(s=>s.k===a.status)-ST.findIndex(s=>s.k===b.status)};
  L.sort(so[F.sort]);_n=0;
  return `<div class="tools"><input class="inp" id="q" placeholder="🔍 搜索公司、岗位、城市、备注、简历" value="${esc(F.q)}" style="width:300px">
@@ -175,12 +171,12 @@ function vList(){
  <select class="inp" data-flt="channel"><option value="">全部渠道</option>${CH.map(c=>`<option ${F.channel===c?'selected':''}>${c}</option>`).join('')}</select>
  <select class="inp" data-flt="sort">${[['updated','最近更新'],['applied','投递日期'],['priority','优先级'],['status','进度'],['company','公司名']].map(([k,n])=>`<option value="${k}" ${F.sort===k?'selected':''}>按${n}排序</option>`).join('')}</select>
  <span style="color:var(--muted);font-size:13px">${L.length} 条</span><span style="flex:1"></span><button class="btn sm" data-act="hunt" title="联网搜索合适的岗位，一键加进待投递">🧭 AI 找岗位</button><button class="btn sm" data-act="csv" title="导出全部投递，可用 Excel 打开">📊 导出 Excel</button></div>
- <div class="card" style="overflow:hidden"><table><thead><tr><th>公司 / 岗位</th><th>进度</th><th>城市</th><th>薪资</th><th>渠道</th><th>投递日期</th><th>下一步</th><th>链接</th></tr></thead><tbody>
- ${L.slice(0,LIST_LIM).map(a=>{const ne=nextEvent(a),p=PRI[a.priority]||PRI[2];return `<tr data-open="${a.id}" style="--n:${_n++}"><td><div class="t1" style="display:flex;align-items:center;gap:7px"><span class="dot" style="background:${p[1]}"></span>${esc(a.company)}</div><div class="t2">${esc(a.role)}</div></td><td>${stTag(a.status)}</td><td>${esc(a.city)}</td><td>${esc(a.salary)}</td><td>${esc(a.channel)}</td><td>${a.appliedAt||''}</td><td>${ne?`<span class="t2">${ne.at.slice(5,16).replace('T',' ')} ${EV[ne.type]}</span>`:'<span class="t2">—</span>'}</td><td style="white-space:nowrap">${ext(safeUrl(a.link),'岗位','tag')} ${ext(safeUrl(a.site),'官网','tag')}${!safeUrl(a.link)&&!safeUrl(a.site)?'<span class="t2">—</span>':''}</td></tr>`;}).join('')||`<tr><td colspan="8"><div class="empty">${db.apps.length?'没有匹配的记录':'还没有投递记录，点右上角「＋ 新增投递」添加第一条'}</div></td></tr>`}
+ ${bulkBar()}<div class="card" style="overflow:hidden"><table><thead><tr><th class="selc" data-act="selall" title="${allSel?'取消全选':'选中当前筛选出的全部 '+L.length+' 条'}"><input type="checkbox" tabindex="-1" ${allSel?'checked':''}></th><th>公司 / 岗位</th><th>进度</th><th>城市</th><th>薪资</th><th>渠道</th><th>投递日期</th><th>下一步</th><th>链接</th></tr></thead><tbody>
+ ${L.slice(0,LIST_LIM).map(a=>{const ne=nextEvent(a),p=PRI[a.priority]||PRI[2];return `<tr data-open="${a.id}" class="${SEL.has(a.id)?'sel':''}" style="--n:${_n++}"><td class="selc" data-act="sel" data-a="${a.id}"><input type="checkbox" tabindex="-1" ${SEL.has(a.id)?'checked':''}></td><td><div class="t1" style="display:flex;align-items:center;gap:7px"><span class="dot" style="background:${p[1]}"></span>${esc(a.company)}</div><div class="t2">${esc(a.role)}</div></td><td>${stTag(a.status)}</td><td>${esc(a.city)}</td><td>${esc(a.salary)}</td><td>${esc(a.channel)}</td><td>${a.appliedAt||''}</td><td>${ne?`<span class="t2">${ne.at.slice(5,16).replace('T',' ')} ${EV[ne.type]}</span>`:'<span class="t2">—</span>'}</td><td style="white-space:nowrap">${ext(safeUrl(a.link),'岗位','tag')} ${ext(safeUrl(a.site),'官网','tag')}${!safeUrl(a.link)&&!safeUrl(a.site)?'<span class="t2">—</span>':''}</td></tr>`;}).join('')||`<tr><td colspan="9"><div class="empty">${db.apps.length?'没有匹配的记录':'还没有投递记录，点右上角「＋ 新增投递」添加第一条'}</div></td></tr>`}
  </tbody></table>${L.length>LIST_LIM?`<div style="padding:12px;text-align:center"><button class="btn" data-act="listmore">显示更多（还有 ${L.length-LIST_LIM} 条）</button></div>`:''}</div>`;
 }
 function vCal(){
- const E=allEvents().filter(({e})=>e.at).sort((x,y)=>x.e.at.localeCompare(y.e.at));
+ const E=allEvents().filter(({e})=>e.at&&e.type!=='reply').sort((x,y)=>x.e.at.localeCompare(y.e.at));
  const head=`<div class="tools"><div class="seg"><button data-cal="list" class="${calMode==='list'?'on':''}">列表</button><button data-cal="month" class="${calMode==='month'?'on':''}">月历</button></div>
   ${calMode==='month'?`<button class="btn sm" data-mon="-1">‹</button><b>${calMonth.getFullYear()} 年 ${calMonth.getMonth()+1} 月</b><button class="btn sm" data-mon="1">›</button><button class="btn sm ghost" data-mon="0">回到本月</button>`:''}
   <span style="flex:1"></span><button class="btn sm" data-act="invite">📋 粘贴面试邀请</button><button class="btn sm" data-act="icsall" title="生成 .ics 文件，可导入手机或电脑日历">📅 导出未来日程到日历</button></div>`;
@@ -264,12 +260,15 @@ function vSettings(){
  <div class="row" style="flex-wrap:wrap;gap:8px"><button class="btn" data-act="extopen">📂 打开扩展文件夹</button><button class="btn ghost" data-act="extcopy">复制 edge://extensions</button><span class="t2" id="extStat">${TOKEN?'检查中…':''}</span></div><div id="extDiag"></div></div>
  ${TOKEN?`<div class="card set"><h3>🤖 Agent 额度（可选）</h3><p>给同时在用 AI 编程工具的人：打开后，履迹会读取本机 Claude Code、Codex、Kimi、Qoder、Gemini 等工具的用量记录，在「Agent 额度」页显示还剩多少额度。这些记录只在你电脑上读取，不会上传。和求职无关，默认关闭。</p>
  <div class="row" style="gap:8px">${agShow()?'<span class="tag" style="color:var(--ok)">✓ 已打开</span><button class="btn" data-act="agentoff">关闭</button>':'<button class="btn" data-act="agenton">打开 Agent 额度</button>'}</div></div>`:''}
+ ${TOKEN?mailCardSet():''}
+ ${TOKEN?phoneCard():''}
  <div class="card set"><h3>🧩 力扣同步</h3><p>填上力扣（leetcode.cn）用户名，概览页会显示刷题数、提交热力图、每日一题和最近通过的题，打开履迹时和之后每 30 分钟自动同步。只读取公开主页，不需要登录，也不要密码。用户名就是个人主页网址 leetcode.cn/u/<b>这一段</b>/，直接粘贴主页网址也行。</p><div class="row" style="flex-wrap:wrap;gap:8px"><input class="inp" id="lcU" value="${esc(db.settings.lcUser||'')}" placeholder="如：zhang-san" style="width:220px"><button class="btn primary" data-act="lcsave">${db.settings.lcUser?'保存并同步':'连接'}</button>${db.settings.lcUser?'<button class="btn ghost" data-act="lcoff">断开</button>':''}<span class="t2" id="lcStat">${db.lcErr?'😵 '+esc(db.lcErr):db.lc?`✓ 已连上 ${esc(db.lc.name)}，累计 ${db.lc.solved.all} 题，${ago(db.lc.at,Date.now())}同步`:''}</span></div></div>
  <div class="card set"><h3>🤖 AI 助手</h3><p>模拟面试、识别面试邀请、按 JD 改简历、参考答案、写话术、复盘总结和公司速查都会用到。用的时候会把这次需要的内容（JD、简历、题目、复盘等）发给对应的服务，不用就不会发。首选的不可用（没余额、没登录）时会自动换下一个；公司速查要联网搜索，只能用 Claude Code 或 Codex。</p><div class="row"><span>首选</span><select class="inp" data-set="aiEngine" style="width:auto">${[['deepseek','DeepSeek（最快、最便宜）'],['claude','Claude Code'],['codex','Codex（较慢）']].map(([k,n])=>`<option value="${k}" ${(db.settings.aiEngine||'deepseek')===k?'selected':''}>${n}</option>`).join('')}</select><button class="btn sm" data-act="aitest">测试一下</button></div><div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px"><span>DeepSeek 密钥</span><input class="inp" type="password" id="dsKey" placeholder="sk-…（在 platform.deepseek.com 申请）" autocomplete="off" style="width:280px"><button class="btn sm" data-act="dskey">保存</button><span class="t2" id="dsKeyStat"></span></div><div class="row" id="aiStat" style="margin-top:8px;flex-wrap:wrap;gap:6px"><span class="t2">${TOKEN?'正在检查…':'要从桌面快捷方式打开履迹才能用 AI'}</span></div></div>
  <div class="card set"><h3>🙋 关于我</h3><p>名字、目标岗位、意向城市、期望薪资、求职开始日期和给自己的一句话，会显示在概览顶部。</p><div class="row"><button class="btn" data-act="editme">编辑</button></div></div>
  <div class="card set"><h3>🎯 每周投递目标</h3><p>概览页会显示本周进度。设为 0 则不显示。</p><div class="row"><input class="inp" type="number" min="0" max="200" data-set="weekGoal" value="${db.settings.weekGoal}" style="width:100px"> 个 / 周</div></div>
+ ${navPinCard()}
  <div class="card set"><h3>🎨 外观</h3><p>当前：${db.theme==='dark'?'深色':'浅色'}</p><div class="row"><button class="btn" data-act="theme">切换深色 / 浅色</button></div></div>
  ${db.apps.some(a=>a.sample)?`<div class="card set"><h3>🧹 示例数据</h3><p>当前有 ${db.apps.filter(a=>a.sample).length} 条示例记录。</p><div class="row"><button class="btn danger" data-act="clearsample">清除全部示例数据</button></div></div>`:''}
- <div class="card set"><h3>⌨️ 快捷键</h3><div class="kbd"><kbd>Ctrl + K</kbd><span>全局搜索：投递、人脉、故事、能力、日记、题目、页面</span><kbd>空格 / 1 2 3</kbd><span>抽卡复习时：翻面 / 忘了 / 模糊 / 记得</span><kbd>Ctrl + N</kbd><span>新增投递</span><kbd>Ctrl + V</kbd><span>不在输入框时粘贴链接或多行文字，自动新建投递</span><kbd>Esc</kbd><span>关闭面板 / 弹窗</span><kbd>1 ~ 9</kbd><span>切换左侧页面（不在输入时）</span></div></div>`;
+ <div class="card set"><h3>⌨️ 快捷键</h3><div class="kbd"><kbd>Ctrl + K</kbd><span>全局搜索：投递、人脉、故事、能力、日记、题目、页面</span><kbd>空格 / 1 2 3</kbd><span>抽卡复习时：翻面 / 忘了 / 模糊 / 记得</span><kbd>Ctrl + N</kbd><span>新增投递</span><kbd>Ctrl + V</kbd><span>不在输入框时粘贴链接或多行文字，自动新建投递</span><kbd>Esc</kbd><span>关闭面板 / 弹窗</span><kbd>1 ~ 9</kbd><span>切换左边栏常驻的页面（不在输入时）</span></div></div>`;
 }
 

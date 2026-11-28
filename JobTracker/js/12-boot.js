@@ -42,8 +42,8 @@ const INBOX='http://127.0.0.1:47321/api/inbox';let inboxBusy=false;
 async function pullInbox(){if(!TOKEN||inboxBusy)return;inboxBusy=true;
  try{const r=await fetch(INBOX,{headers:{'x-token':TOKEN},cache:'no-store'});if(!r.ok)return;const items=(await r.json()).items||[];if(!items.length)return;
   const have=new Set(db.apps.map(a=>a.inboxId).filter(Boolean)),fresh=items.filter(it=>!have.has(it.id));
-  const added=[],upd=[],chats=[];
-  for(const it of fresh){if(it.kind==='chat'){chats.push(it);continue;}const wish=it.status==='wish';
+  const added=[],upd=[],chats=[],replies=[],rep=[],mails=[];
+  for(const it of fresh){if(it.kind==='mail'){mails.push(it);continue;}if(it.kind==='chat'){chats.push(it);continue;}if(it.kind==='reply'){replies.push(it);continue;}const wish=it.status==='wish';
    const ex=it.company&&db.apps.find(a=>sameCo(a.company,it.company)&&(!it.role||!a.role||coKey(a.role)===coKey(it.role)));
    if(ex){ex.inboxId=it.id;for(const k of ['link','city','salary'])if(!ex[k]&&it[k])ex[k]=it[k];if(it.jd&&!String(ex.notes||'').includes(it.jd.slice(0,40)))ex.notes=[ex.notes,it.jd].filter(Boolean).join('\n\n');if(it.hr&&!ex.contact)ex.contact=it.hr;
     if(!wish&&ex.status==='wish'){ex.appliedAt=dstr(new Date(it.at||Date.now()));setStatus(ex,'applied',true);}touch(ex);upd.push(ex.company);continue;}
@@ -54,8 +54,10 @@ async function pullInbox(){if(!TOKEN||inboxBusy)return;inboxBusy=true;
    if(!a&&it.company){a=newApp({inboxId:it.id,company:it.company,role:it.role||'',channel:'Boss直聘',status:'applied',appliedAt:today(),contact:it.hr||''});logStatus(a,'',a.status);db.apps.push(a);added.push(a.company);}
    if(a){a.notes=[a.notes,`【Boss 聊天 · ${nowLocal().replace('T',' ')}${it.hr?' · '+it.hr:''}】\n${t.slice(0,3000)}`].filter(Boolean).join('\n\n');if(it.hr&&!a.contact)a.contact=it.hr;if(a.status==='wish')setStatus(a,'applied',true);touch(a);}
    if(looksInvite(t))inv={t,aid:a?.id||''};else chatMsg.push(a);}
+  if(mails.length){const n=db.mails.length;addMails(db.mails,mails);mails.length=Math.max(0,db.mails.length-n);}
+  for(const it of replies){const a=replyApp(db.apps,it);if(addReply(a,it,localAt(it.at))){if(a.status==='wish')setStatus(a,'applied',true);touch(a);rep.push(a.company);}}
   if(fresh.length){persist();flushSave();render();
-   const msg=[added.length&&`收进 ${added.length} 条：${added.slice(0,5).join('、')}${added.length>5?' 等':''}`,upd.length&&`更新 ${upd.length} 条：${upd.slice(0,3).join('、')}`,chatMsg.length&&`${chatMsg.filter(Boolean).map(a=>a.company).join('、')||'一段'} 聊天已存进备注`].filter(Boolean).join('；');
+   const msg=[added.length&&`收进 ${added.length} 条：${added.slice(0,5).join('、')}${added.length>5?' 等':''}`,upd.length&&`更新 ${upd.length} 条：${upd.slice(0,3).join('、')}`,rep.length&&`💬 ${rep.slice(0,3).join('、')}${rep.length>3?' 等':''} 的 HR 回复了`,mails.length>0&&`📧 收到 ${mails.length} 封招聘邮件，在概览里处理`,chatMsg.length&&`${chatMsg.filter(Boolean).map(a=>a.company).join('、')||'一段'} 聊天已存进备注`].filter(Boolean).join('；');
    if(msg)toast((fresh.every(x=>x.auto)?'🔗 自动记录 · ':'📥 ')+msg,chatMsg[0]?['查看',()=>openDrawer(chatMsg[0].id)]:null,6000);
    if(inv){const go=()=>{openInvite(inv.t,inv.aid);setTimeout(invGo,60);};if(!document.getElementById('modal').classList.contains('on'))go();else toast('📥 收到一段像面试邀请的 Boss 聊天',['识别并建日程',go],20000);}}
   await fetch(INBOX,{method:'DELETE',headers:{'x-token':TOKEN,'content-type':'application/json'},body:JSON.stringify({ids:items.map(x=>x.id)})});

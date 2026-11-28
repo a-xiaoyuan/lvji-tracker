@@ -105,3 +105,19 @@ test('扩展清单：四个招聘网站都挂了内容脚本，文件都在', ()
   for (const h of ['zhipin.com', 'nowcoder.com', 'zhaopin.com', '51job.com']) assert.ok(hosts.includes(h), '清单里缺 ' + h);
   for (const c of m.content_scripts) for (const f of c.js) assert.ok(fs.existsSync(path.join(ROOT, 'extension', f)), '清单里的文件不存在：' + f);
 });
+
+test('HR 回复：送给履迹，同一段聊天只记一次；关掉「聊天」开关后不记', async () => {
+  const x = boot();
+  const rep = { kind: 'reply', channel: 'Boss直聘', company: '星河云', role: 'Java开发', hr: '王女士', text: '你好，方便发一下简历吗' };
+  assert.deepEqual(await x.msg({ type: 'record', item: rep, key: 'reply|星河云|Java开发' }), { ok: true });
+  assert.deepEqual(await x.msg({ type: 'record', item: rep, key: 'reply|星河云|Java开发' }), { ok: true, dup: true });
+  const sent = x.calls.filter(c => c.url.endsWith('/inbox'));
+  assert.equal(sent.length, 1); assert.equal(sent[0].body.kind, 'reply'); assert.equal(sent[0].body.text, rep.text);
+  x.store.autoInvite = false;
+  assert.deepEqual(await x.msg({ type: 'record', item: rep, key: 'reply|别家' }), { ok: false, why: 'off' });
+});
+
+test('Boss 内容脚本：认 HR 回复的代码还在', () => {
+  const s = fs.readFileSync(path.join(ROOT, 'extension', 'content-boss.js'), 'utf8');
+  assert.match(s, /kind: 'reply'/); assert.match(s, /checkReply\(\);/);
+});

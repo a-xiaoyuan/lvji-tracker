@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from './extract.mjs';
 
-const PORT = 47500 + Math.floor(Math.random() * 400);
+const PORT = 47500 + Math.floor(Math.random() * 400), PHONE = PORT + 400;
 const BASE = `http://127.0.0.1:${PORT}`;
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'lvji-test-'));
 const DATA = path.join(TMP, 'data'), STATE = path.join(TMP, 'state');
@@ -19,7 +19,7 @@ fs.writeFileSync(path.join(STATE, 'token.txt'), TOKEN);
 let srv;
 test.before(async () => {
   srv = spawn(process.execPath, [path.join(ROOT, 'helper', 'server.mjs')], {
-    env: { ...process.env, LVJI_PORT: String(PORT), LVJI_DATA_DIR: DATA, LVJI_STATE_DIR: STATE, LVJI_NO_NOTIFY: '1', DEEPSEEK_API_KEY: '' },
+    env: { ...process.env, LVJI_PORT: String(PORT), LVJI_PHONE_PORT: String(PHONE), LVJI_DATA_DIR: DATA, LVJI_STATE_DIR: STATE, LVJI_NO_NOTIFY: '1', DEEPSEEK_API_KEY: '' },
     stdio: 'ignore',
   });
   for (let i = 0; i < 50; i++) { try { if ((await fetch(BASE + '/api/health')).ok) return; } catch {} await new Promise(r => setTimeout(r, 100)); }
@@ -97,4 +97,53 @@ test('Agent 额度默认关闭，打开后才读取', async () => {
   const off = await (await fetch(BASE + '/api/agent/enable', { method: 'POST', headers: H, body: JSON.stringify({ on: false }) })).json();
   assert.equal(off.on, false);
   assert.ok(!fs.existsSync(path.join(STATE, 'agent-on.txt')));
+});
+
+test('手机查看：默认关闭；打开后只有带对访问码才能看，而且只给精简数据', async () => {
+  const P = `http://127.0.0.1:${PHONE}`;
+  assert.equal((await fetch(BASE + '/api/phone')).status, 401, '开关要密钥');
+  assert.equal((await (await fetch(BASE + '/api/phone', { headers: H })).json()).on, false);
+  await assert.rejects(fetch(P + '/data'), '没打开时端口不监听');
+  assert.equal((await put(doc(Date.now(), [{ id: 'p1', company: '星河云', role: '后端', status: 'interview', notes: '内推人手机 138xxxx', salary: '30K', contact: 'hr@x.com', updatedAt: 5,
+    events: [{ id: 'e', type: 'interview', at: new Date(Date.now() + 864e5).toISOString().slice(0, 16), title: '二面', place: '腾讯会议' }] }]))).status, 200);
+  const on = await (await fetch(BASE + '/api/phone', { method: 'POST', headers: H, body: JSON.stringify({ on: true }) })).json();
+  assert.equal(on.on, true);
+  assert.equal(on.code, undefined, '访问码只放在链接里，不单独给');
+  assert.equal(fs.existsSync(path.join(STATE, 'phone.json')), true);
+  const code = JSON.parse(fs.readFileSync(path.join(STATE, 'phone.json'), 'utf8')).code;
+  assert.match(code, /^[a-z2-9]{12}$/);
+  assert.equal((await fetch(P + '/data')).status, 401);
+  assert.equal((await fetch(P + '/data', { headers: { 'x-code': 'x'.repeat(12) } })).status, 401);
+  assert.equal((await fetch(P + '/api/jobtracker', { headers: H })).status, 404, '手机端口上没有完整数据接口');
+  const r = await fetch(P + '/data', { headers: { 'x-code': code } });
+  assert.equal(r.status, 200);
+  const t = await r.text(), j = JSON.parse(t);
+  assert.equal(j.apps[0].c, '星河云'); assert.equal(j.events[0].title, '二面'); assert.equal(j.counts.interview, 1);
+  for (const leak of ['138xxxx', '30K', 'hr@x.com']) assert.ok(!t.includes(leak), '不应带出：' + leak);
+  assert.equal((await fetch(P + '/')).status, 200);
+  const re = await (await fetch(BASE + '/api/phone', { method: 'POST', headers: H, body: JSON.stringify({ on: true, reset: true }) })).json();
+  assert.equal(re.on, true);
+  assert.equal((await fetch(P + '/data', { headers: { 'x-code': code } })).status, 401, '换链接后旧访问码失效');
+  const off = await (await fetch(BASE + '/api/phone', { method: 'POST', headers: H, body: JSON.stringify({ on: false }) })).json();
+  assert.equal(off.on, false);
+  await assert.rejects(fetch(P + '/data'), '关闭后端口不再监听');
+});
+
+test('邮箱收信：默认关闭；授权码存在本机，接口读不回来', async () => {
+  const post = b => fetch(BASE + '/api/mail', { method: 'POST', headers: H, body: JSON.stringify(b) });
+  assert.equal((await fetch(BASE + '/api/mail')).status, 401, '要密钥');
+  const i0 = await (await fetch(BASE + '/api/mail', { headers: H })).json();
+  assert.equal(i0.on, false); assert.equal(i0.hasPass, false);
+  assert.equal((await post({ user: '不是邮箱' })).status, 400);
+  const noPass = await (await post({ user: 'test@qq.com', on: true })).json();
+  assert.equal(noPass.on, false, '没授权码不能打开');
+  const r = await post({ user: 'test@qq.com', pass: 'abcd efgh ijkl mnop' }), t = await r.text(), j = JSON.parse(t);
+  assert.equal(r.status, 200); assert.equal(j.hasPass, true); assert.equal(j.user, 'test@qq.com'); assert.equal(j.on, false);
+  assert.ok(!t.includes('abcd'), '授权码不能出现在接口返回里');
+  assert.equal(fs.readFileSync(path.join(STATE, 'mail-pass.txt'), 'utf8'), 'abcdefghijklmnop', '去掉空格再存');
+  const g = await (await fetch(BASE + '/api/mail', { headers: H })).text();
+  assert.ok(!g.includes('abcd'));
+  const f = await (await post({ forget: true })).json();
+  assert.equal(f.hasPass, false); assert.equal(f.user, '');
+  assert.equal(fs.existsSync(path.join(STATE, 'mail-pass.txt')), false);
 });

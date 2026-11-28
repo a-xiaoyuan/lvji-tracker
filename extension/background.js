@@ -56,14 +56,14 @@ chrome.runtime.onMessage.addListener((m, sender, reply) => {
     if (m.type === 'record') {
       const opts = await get(['autoApply', 'autoInvite']);
       if (m.item.kind === 'job' && opts.autoApply === false && !m.manual) return { ok: false, why: 'off' };
-      if (m.item.kind === 'chat' && opts.autoInvite === false) return { ok: false, why: 'off' };
+      if ((m.item.kind === 'chat' || m.item.kind === 'reply') && opts.autoInvite === false) return { ok: false, why: 'off' };
       if (m.key && await seen(m.key)) return { ok: true, dup: true };
       try { await call('/inbox', { ...m.item, auto: '1' }); }
       catch (e) {
         // 没送到：把「已经记过」的标记撤掉，下次还能再记；并写进自检记录
         const { seenKeys = {} } = await get('seenKeys'); if (m.key) { delete seenKeys[m.key]; await chrome.storage.local.set({ seenKeys }); }
         const why = e.message === '未配对' ? '扩展还没和履迹连上（打开一次履迹就好）' : /fetch/i.test(e.message) ? '履迹没在运行' : e.message;
-        await diag({ site: m.item.channel || '', stage: m.item.kind === 'chat' ? '面试邀请' : '记录岗位', why: `${why}：${m.item.company || ''} ${m.item.role || ''}`.trim(), url: sender.tab?.url });
+        await diag({ site: m.item.channel || '', stage: m.item.kind === 'chat' ? '面试邀请' : m.item.kind === 'reply' ? 'HR 回复' : '记录岗位', why: `${why}：${m.item.company || ''} ${m.item.role || ''}`.trim(), url: sender.tab?.url });
         throw e;
       }
       await log({ kind: m.item.kind, company: m.item.company, role: m.item.role, status: m.item.status });

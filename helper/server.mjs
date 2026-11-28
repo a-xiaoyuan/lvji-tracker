@@ -1,4 +1,5 @@
-// 本机小助手：只监听 127.0.0.1
+// 本机小助手：只监听 127.0.0.1（可选的「手机上看」另开一个局域网只读端口，见 phone.mjs，默认关闭）
+//  - 可选的「邮箱收信」：打开后定时只读查看收件箱里的招聘通知，见 mail.mjs，默认关闭
 //  - 静态托管「如页」简历编辑器（WASM 排版引擎需要 http 才能运行）
 //  - 为「求职进度」提供自动备份接口，数据写到 文档\求职进度\
 import http from 'node:http';
@@ -13,6 +14,8 @@ import { agentUsage } from './agent-usage.mjs';
 import { othersUsage } from './agents-more.mjs';
 import { runAI, aiStatus, setDeepseekKey } from './ai.mjs';
 import { lcSync } from './leetcode.mjs';
+import { createPhone } from './phone.mjs';
+import { createMail } from './mail.mjs';
 
 // LVJI_PORT / LVJI_DATA_DIR / LVJI_STATE_DIR 只给自动测试用：让测试跑在临时目录里，碰不到真实数据
 const PORT = +process.env.LVJI_PORT || 47321;
@@ -36,6 +39,9 @@ const agentOn = () => fs.existsSync(AGENT_ON_FILE);
 const SNAP_DIR = path.join(BACKUP_DIR, '恢复前');
 const EXT_DIR = path.resolve(HERE, '..', 'extension'); // 浏览器扩展「履迹助手」
 let extSeen = 0, extVer = '', extDiag = [];
+const phone = createPhone({ stateDir: STATE, dataFile: DATA_FILE, pageFile: path.join(JOBS, 'phone.html'), port: +process.env.LVJI_PHONE_PORT || 47322 });
+// 邮箱收信（可选，默认关闭）：像招聘通知的邮件放进收件箱，履迹里显示成「待处理的邮件」，见 mail.mjs
+const mail = createMail({ stateDir: STATE, push: async (it) => { const list = await readInbox(); if (list.length >= 500) return; list.push({ id: crypto.randomBytes(8).toString('hex'), ...it }); await writeInbox(list); } });
 let lastSeen = 0; // 履迹页面最后一次带密钥访问的时间，用来判断窗口是否开着
 
 /* ---------- 履迹关着时的面试提醒（Windows 通知） ---------- */
@@ -276,6 +282,17 @@ async function api(req, res) {
       await (saveQ = saveQ.then(() => saveData(body), () => saveData(body)));
       return send(res, 200, { ok: true, folder: DATA_DIR, savedAt: body.savedAt });
     } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
+  }
+  // 手机查看（可选功能，默认关闭）：在局域网里开一个只读小页面，见 phone.mjs
+  if (req.url === '/api/phone' && req.method === 'GET') return send(res, 200, phone.info());
+  if (req.url === '/api/phone' && req.method === 'POST') {
+    let b = {}; try { b = JSON.parse(await readBody(req, 1024) || '{}'); } catch { return send(res, 400, { error: 'bad payload' }); }
+    return send(res, 200, await phone.set(!!b.on, !!b.reset));
+  }
+  if (req.url === '/api/mail' && req.method === 'GET') return send(res, 200, mail.info());
+  if (req.url === '/api/mail' && req.method === 'POST') {
+    let b = {}; try { b = JSON.parse(await readBody(req, 4096) || '{}'); } catch { return send(res, 400, { error: 'bad payload' }); }
+    try { return send(res, 200, await mail.set({ user: b.user, pass: b.pass, on: b.on, check: !!b.check, forget: !!b.forget })); } catch (e) { return send(res, 400, { error: String(e.message || e) }); }
   }
   // Agent 额度（可选功能，默认关闭）：开关
   if (req.url === '/api/agent/enable' && req.method === 'POST') {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "履迹助手 · 投递自动记录",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "在 Boss直聘、牛客网、智联招聘、前程无忧 投递时，自动把岗位记到本机的履迹；HR 发来面试邀请时提醒你建日程；在网申页面点扩展按钮，还能按你的档案填空字段（只填不提交）。只和本机的履迹通信，不收集任何数据。",
   "icons": { "128": "icon.png" },
   "action": { "default_popup": "popup.html", "default_icon": "icon.png", "default_title": "履迹助手" },

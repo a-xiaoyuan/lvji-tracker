@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16161d">
+<title>履迹 · 手机版</title>
+<style>
+:root{--bg:#f4f4f6;--panel:#fff;--ink:#16161d;--muted:#6b6f78;--line:#e3e4e8;--accent:#ff2d87;--soft:#eef0f3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;padding:0 0 env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:2;background:var(--ink);color:#fff;padding:14px 16px 12px;display:flex;align-items:center;gap:10px}
+header h1{margin:0;font-size:18px;font-weight:900;flex:1}
+header small{opacity:.7;font-size:12px}
+button{font:inherit;border:2px solid var(--ink);background:var(--panel);color:var(--ink);border-radius:9px;padding:5px 12px;font-weight:700}
+header button{border-color:#fff;background:transparent;color:#fff;padding:3px 10px;font-size:13px}
+main{padding:12px;max-width:640px;margin:0 auto}
+.card{background:var(--panel);border:2px solid var(--ink);border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:3px 3px 0 var(--ink)}
+h2{font-size:15px;margin:0 0 8px;font-weight:900}
+.cnt{display:flex;flex-wrap:wrap;gap:6px}
+.cnt span{background:var(--soft);border-radius:999px;padding:3px 10px;font-size:13px}
+.cnt b{margin-left:4px}
+.day{font-size:12.5px;color:var(--muted);margin:10px 0 4px;font-weight:700}
+.day:first-of-type{margin-top:0}
+.ev{display:flex;gap:10px;padding:8px 0;border-top:1px dashed var(--line)}
+.ev:first-of-type{border-top:0}
+.ev .t{font-weight:900;min-width:48px}
+.ev .t.today{color:var(--accent)}
+.ev .x{flex:1;min-width:0}
+.ev .p{font-size:12.5px;color:var(--muted);word-break:break-all}
+.app{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px dashed var(--line)}
+.app:first-of-type{border-top:0}
+.app .x{flex:1;min-width:0}
+.app .r{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:12px;border:1.5px solid var(--ink);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.tag.offer{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tag.end{opacity:.5}
+input{width:100%;font:inherit;border:2px solid var(--ink);border-radius:9px;padding:7px 10px;margin-bottom:8px;background:var(--panel)}
+.msg{text-align:center;padding:40px 16px;color:var(--muted)}
+.msg b{display:block;color:var(--ink);font-size:17px;margin-bottom:8px}
+.empty{color:var(--muted);font-size:13.5px}
+.more{text-align:center;color:var(--muted);font-size:12.5px;padding-top:8px}
+</style>
+</head>
+<body>
+<header><h1>履迹</h1><small id="upd"></small><button id="re">刷新</button></header>
+<main id="m"><div class="msg">加载中…</div></main>
+<script>
+'use strict';
+const ST={wish:'待投递',applied:'已投递',test:'笔试/测评',interview:'面试中',hr:'HR 面',offer:'Offer',rejected:'未通过',dropped:'已放弃'};
+const ORDER=['interview','hr','test','offer','applied','wish','rejected','dropped'];
+const WK='日一二三四五六';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let code='',D=null,q='';
+// 访问码在链接 # 后面：存到手机本地，再从地址栏去掉，之后直接打开这个网址也能用
+function grab(){const h=decodeURIComponent(location.hash.slice(1)).trim();try{if(h){localStorage.setItem('lvji_phone',h);history.replaceState(null,'',location.pathname);}code=localStorage.getItem('lvji_phone')||h;}catch(_){code=h||code;}}
+grab();
+const M=document.getElementById('m');
+function msg(t,s){M.innerHTML=`<div class="msg"><b>${t}</b>${s}</div>`;}
+function dayLab(d,td){const x=new Date(d+'T00:00:00'),t=new Date(td+'T00:00:00'),n=Math.round((x-t)/864e5);return (n===0?'今天':n===1?'明天':n===2?'后天':`${x.getMonth()+1} 月 ${x.getDate()} 日`)+` · 星期${WK[x.getDay()]}`;}
+function render(){if(!D)return;
+ const c=D.counts||{},cnt=ORDER.filter(k=>c[k]).map(k=>`<span>${ST[k]}<b>${c[k]}</b></span>`).join('');
+ let ev='',last='';for(const e of D.events){const d=e.at.slice(0,10);if(d!==last){ev+=`<div class="day">${dayLab(d,D.today)}</div>`;last=d;}
+  ev+=`<div class="ev"><div class="t ${d===D.today?'today':''}">${esc(e.at.slice(11,16)||'全天')}</div><div class="x"><b>${esc(e.c)}</b> · ${esc(e.title||(e.type==='test'?'笔试':'面试'))}<div class="p">${esc(e.r)}${e.place?' · '+esc(e.place):''}</div></div></div>`;}
+ const k=q.toLowerCase(),L=D.apps.filter(a=>!k||(a.c+' '+a.r+' '+a.city).toLowerCase().includes(k)),show=L.slice(0,80);
+ M.innerHTML=`<div class="card"><h2>一共 ${D.total} 条记录</h2><div class="cnt">${cnt||'<span>还没有记录</span>'}</div></div>
+ <div class="card"><h2>接下来 30 天的笔试 / 面试</h2>${ev||'<div class="empty">还没有安排</div>'}</div>
+ <div class="card"><h2>最近的投递</h2><input id="q" placeholder="搜公司、岗位、城市" value="${esc(q)}">${show.map(a=>`<div class="app"><div class="x"><b>${esc(a.c)||'未命名公司'}</b><div class="r">${esc(a.r)||'—'}${a.city?' · '+esc(a.city):''}${a.ap?' · '+esc(a.ap.slice(5).replace('-','/'))+' 投':''}</div></div><span class="tag ${a.s==='offer'?'offer':a.s==='rejected'||a.s==='dropped'?'end':''}">${ST[a.s]||esc(a.s)}</span></div>`).join('')||'<div class="empty">没有匹配的</div>'}${L.length>show.length?`<div class="more">还有 ${L.length-show.length} 条，搜一下更快</div>`:''}${D.total>D.apps.length&&!k?`<div class="more">手机上只显示最近更新的 ${D.apps.length} 条</div>`:''}</div>`;
+ const i=document.getElementById('q');i.addEventListener('input',()=>{q=i.value;const p=i.selectionStart;render();const j=document.getElementById('q');j.focus();j.setSelectionRange(p,p);});}
+async function load(){if(!code)return msg('还没有访问码','在电脑上的履迹里打开「设置」→「手机上看」，把手机链接发到手机上，再从那个链接打开。');
+ try{const r=await fetch('/data',{headers:{'x-code':code},cache:'no-store'});
+  if(r.status===401)return msg('链接失效了','在电脑上的履迹里打开「设置」→「手机上看」，重新复制手机链接。');
+  if(r.status===429)return msg('试错太多次了','10 分钟后再试。');
+  if(!r.ok)throw 0;D=await r.json();const t=new Date();document.getElementById('upd').textContent=`${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')} 更新`;render();}
+ catch(_){if(!D)msg('连不上电脑','电脑要开着、履迹要开着，手机和电脑要连同一个 Wi-Fi。');}}
+document.getElementById('re').onclick=load;
+addEventListener('hashchange',()=>{grab();load();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
+load();
+</script>
+</body>
+</html>

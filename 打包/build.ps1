@@ -1,5 +1,5 @@
 ﻿# 打包履迹：把当前正在用的版本做成可以发给别人的安装包（桌面上的 zip）
-# 不会打包：访问密钥、DeepSeek 密钥、你的数据（文档\求职进度）、Agent 用量记录
+# 不会打包：访问密钥、DeepSeek 密钥、邮箱授权码、手机访问码、你的数据（文档\求职进度）、Agent 用量记录
 $ErrorActionPreference = 'Stop'
 $Host.UI.RawUI.WindowTitle = '打包履迹'
 $Apps = Split-Path -Parent $PSScriptRoot
@@ -19,11 +19,14 @@ if (Test-Path $Root) { Remove-Item $Root -Recurse -Force }
 New-Item -ItemType Directory -Force "$Stage\app", "$Stage\setup" | Out-Null
 
 # 1. 程序文件
-$skip = @('token.txt', 'deepseek-key.txt', 'agent-usage.json', 'migrated.txt', 'digest-sent.txt', 'agent-on.txt', 'launch.vbs', '*.log', '*.bak', '*.tmp')
+$skip = @('token.txt', 'deepseek-key.txt', 'agent-usage.json', 'migrated.txt', 'digest-sent.txt', 'agent-on.txt', 'phone.json', 'mail.json', 'mail-pass.txt', 'launch.vbs', '*.log', '*.bak', '*.tmp')
 foreach ($d in 'JobTracker', 'Ruye', 'helper', 'extension') {
-  $null = robocopy (Join-Path $Apps $d) "$Stage\app\$d" /MIR /XF $skip /XD node_modules .git /NFL /NDL /NJH /NJS /NP
+  # 小助手的 node_modules 要带上（邮箱收信用的 imapflow、mailparser），其他文件夹的不带
+  $xd = if ($d -eq 'helper') { @('.git') } else { @('node_modules', '.git') }
+  $null = robocopy (Join-Path $Apps $d) "$Stage\app\$d" /MIR /XF $skip /XD $xd /NFL /NDL /NJH /NJS /NP
   if ($LASTEXITCODE -ge 8) { Fail "复制 $d 失败" }
 }
+if (-not (Test-Path "$Stage\app\helper\node_modules\imapflow")) { Fail '缺少邮箱收信组件：先在 helper 文件夹里运行 npm ci --omit=dev' }
 if (-not (Test-Path "$Stage\app\Ruye\index.html")) { Fail '缺少如页（Ruye\index.html）。先运行 打包\get-ruye.ps1' }
 # 如页的图标：已有（比如你自己换过的）就不动，没有就用默认的
 foreach ($f in 'app.ico', 'ruye-avatar.ico') { if (-not (Test-Path "$Stage\app\Ruye\$f")) { Copy-Item "$PSScriptRoot\ruye-icon\$f" "$Stage\app\Ruye\" } }
@@ -47,6 +50,7 @@ Say "✓ 安装脚本" Green
 $needles = @{}
 $tf = Join-Path $Apps 'helper\token.txt'; if (Test-Path $tf) { $needles['访问密钥'] = (Get-Content $tf -Raw).Trim() }
 $k = [Environment]::GetEnvironmentVariable('DEEPSEEK_API_KEY', 'User'); if ($k) { $needles['DeepSeek 密钥'] = $k }
+$mf = Join-Path $Apps 'helper\mail-pass.txt'; if (Test-Path $mf) { $needles['邮箱授权码'] = (Get-Content $mf -Raw).Trim() }
 $kf = Join-Path $Apps 'helper\deepseek-key.txt'; if (Test-Path $kf) { $needles['DeepSeek 密钥（文件）'] = (Get-Content $kf -Raw).Trim() }
 $needles['本机用户路径'] = "Users\$env:USERNAME\"
 $needles['本机用户路径 '] = "Users/$env:USERNAME/"

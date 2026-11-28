@@ -1,6 +1,6 @@
 // 履迹助手 · 在 Boss直聘 网页上运行
 // 1. 你点「立即沟通 / 投递」时，把这个岗位记到履迹（已投递）
-// 2. 聊天里出现面试邀请时，交给履迹识别成日程
+// 2. 聊天里出现面试邀请时，交给履迹识别成日程；HR 回了消息，给这家记一笔「HR 已回复」
 // 3. 左下角的小按钮可以把正在看的岗位先收藏到履迹
 // 只读取你正在看的页面，不会替你点任何按钮，也不会访问 Boss 的接口。
 (() => {
@@ -68,8 +68,25 @@
       hr: q('.chat-conversation .top-info .name|[class*=top-info] .name|.base-info .name'),
       role: q('.chat-conversation .top-info .position|[class*=top-info] [class*=position]|.base-info [class*=position]|.position-name') };
   }
+  // HR 回复：打开的这段聊天里有对方发来的消息（Boss 里对方的消息和自己的消息样式不同）
+  const FRIEND = '.item-friend,[class*="item-friend"],.message-item.friend,[class*="msg-friend"],[class*="message-friend"]';
+  const MINE = '.item-myself,[class*="item-myself"],.message-item.myself,[class*="msg-myself"],[class*="message-myself"]';
+  let replyMiss = false;
+  function checkReply() {
+    const fr = [...box.querySelectorAll(FRIEND)].filter(e => T(e));
+    if (!fr.length) {
+      if (!replyMiss && !box.querySelector(MINE) && T(box).length > 40) { replyMiss = true; miss('聊天页', '没分清哪条消息是 HR 发的，HR 回复暂时记不上（可能是 Boss 改版了）'); }
+      return;
+    }
+    const h = chatHead(); if (!h.company) return;
+    const text = T(fr[fr.length - 1]).replace(/\s+/g, ' ').slice(0, 200);
+    send({ kind: 'reply', channel: 'Boss直聘', ...h, text }, 'reply|' + h.company + '|' + h.role).then(r => {
+      if (r.ok && !r.dup) chip.flash(`💬 ${h.company} 的 HR 回复了，已记到履迹`);
+    });
+  }
   function checkChat() {
     if (!box || !document.contains(box)) return;
+    checkReply();
     const all = T(box); const recent = all.slice(-800);
     // 按行找：同一行既提到面试又有时间，才算邀请
     const lines = recent.split('\n').map(s => s.trim()).filter(Boolean);

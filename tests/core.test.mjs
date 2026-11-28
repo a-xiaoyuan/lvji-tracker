@@ -350,3 +350,75 @@ test('页面脚本不调用不存在的 save()（保存数据用 persist()）', 
     assert.ok(!/(^|[^\w.$])save\(\)/m.test(t), f + ' 里调用了 save()');
   }
 });
+
+const MF = load(['dstr', 'pad', 'dayDiff', 'coKey', 'sameCo', 'coMatches', 'weekNums', 'addDays', 'weekReport', 'appReplied', 'timingStats']);
+test('coMatches：同一家公司（写法不同）也能认出来，同岗位排在前面', () => {
+  const apps = [
+    { id: '1', company: '北海星图智能科技有限公司', role: 'Java开发实习生', appliedAt: '2026-11-03', status: 'applied' },
+    { id: '2', company: '星图智能', role: 'AI应用开发', appliedAt: '2026-11-10', status: 'applied' },
+    { id: '3', company: '蓝鲸云科技', role: 'Java开发实习生', appliedAt: '2026-11-11', status: 'applied' },
+  ];
+  const m = MF.coMatches(apps, '北海星图智能科技', 'java开发实习生');
+  assert.deepEqual(m.map(x => x.a.id), ['1', '2']);
+  assert.equal(m[0].same, true); assert.equal(m[1].same, false);
+  assert.equal(MF.coMatches(apps, '字节', '').length, 0);
+  assert.equal(MF.coMatches(apps, 'a', '').length, 0, '太短的名字不比');
+});
+test('weekReport：本周和上周分开统计', () => {
+  const apps = [
+    { status: 'applied', appliedAt: '2026-11-24', events: [{ type: 'test', at: '2026-11-25T19:00' }], history: [] },
+    { status: 'interview', appliedAt: '2026-11-18', events: [{ type: 'interview', at: '2026-11-27T14:00' }], history: [{ at: '2026-11-25 10:00', from: 'applied', to: 'interview' }] },
+    { status: 'wish', appliedAt: '', events: [], history: [] }, null,
+  ];
+  const R = MF.weekReport(apps, '2026-11-23');
+  assert.equal(R.to, '2026-11-29');
+  assert.deepEqual({ ...R.cur }, { sent: 1, rep: 1, iv: 1, ts: 1, off: 0 });
+  assert.equal(R.prev.sent, 1);
+});
+test('timingStats：按星期几、几点统计回复率', () => {
+  const mk = (d, h, replied) => ({ status: replied ? 'interview' : 'applied', appliedAt: d, events: replied ? [{ type: 'interview', at: d.slice(0, 8) + String(+d.slice(8) + 2).padStart(2, '0') + 'T10:00' }] : [], history: [{ at: d + ' ' + h + ':05', from: '', to: 'applied' }] });
+  const apps = [mk('2026-11-02', '09', true), mk('2026-11-09', '09', true), mk('2026-11-16', '20', false), mk('2026-11-04', '20', false), { status: 'wish', appliedAt: '2026-11-02' }];
+  const T = MF.timingStats(apps);
+  assert.equal(T.n, 4);
+  const mon = T.week.find(r => r.k === '周一');
+  assert.equal(mon.n, 3); assert.equal(mon.rep, 2); assert.equal(mon.avg, 2);
+  assert.equal(T.slot.find(r => r.k.startsWith('上午')).rate, 1);
+  assert.equal(T.slot.find(r => r.k.startsWith('晚上')).rate, 0);
+});
+
+const RF = load(['pad', 'dstr', 'uid', 'coKey', 'sameCo', 'replyApp', 'addReply', 'appReplied']);
+test('HR 回复：找到对应投递，记一笔「HR 回复」，只记一次，并算作有回复', () => {
+  const a1 = { id: '1', company: '星河云科技有限公司', role: 'Java开发', status: 'applied', events: [] };
+  const a2 = { id: '2', company: '星河云', role: '测试开发', status: 'rejected', events: [] };
+  const apps = [a2, a1];
+  assert.equal(RF.replyApp(apps, { company: '星河云', role: 'java开发' }), a1);
+  assert.equal(RF.replyApp(apps, { company: '星河云', role: '' }), a1, '没岗位时挑还在进行中的');
+  assert.equal(RF.replyApp(apps, { company: '蓝鲸' }), null);
+  assert.equal(RF.appReplied(a1), false);
+  assert.equal(RF.addReply(a1, { text: '你好，方便发一下简历吗', hr: '王女士' }, '2026-11-28T10:00'), true);
+  assert.equal(a1.events[0].type, 'reply'); assert.equal(a1.events[0].done, true);
+  assert.match(a1.events[0].title, /^HR 回复：你好/);
+  assert.equal(a1.contact, '王女士');
+  assert.equal(RF.appReplied(a1), true);
+  assert.equal(RF.addReply(a1, { text: '又一条' }, '2026-11-28T11:00'), false, '同一条投递只记一次');
+  assert.equal(RF.addReply(null, {}, ''), false);
+});
+
+const MLF = load(['addMails']);
+test('addMails：按时间排、去重、最多留 100 封', () => {
+  const L = [];
+  MLF.addMails(L, [{ id: 'a', at: 1, subj: '旧', text: 'x' }, { id: 'b', at: 3, text: '新邮件标题\n正文' }]);
+  MLF.addMails(L, [{ id: 'a', at: 1 }, null]);
+  assert.deepEqual(L.map(m => m.id), ['b', 'a']);
+  assert.equal(L[0].subj, '新邮件标题', '没标题时用正文第一行');
+  MLF.addMails(L, Array.from({ length: 120 }, (_, i) => ({ id: 'm' + i, at: 10 + i })));
+  assert.equal(L.length, 100); assert.equal(L[0].id, 'm119');
+});
+
+test('normalize：进度历史里的时间是数字时转成文字，坏记录丢掉', () => {
+  const d = F.normalize({ apps: [{ id: 'h', company: 'x', history: [null, { at: 1767225600000, to: 'applied' }, { at: {}, to: 'x' }, { at: '2026-01-02 10:00', to: 'test' }] }] });
+  const h = d.apps[0].history;
+  assert.equal(h.length, 2);
+  assert.match(h[0].at, /^\d{4}-\d\d-\d\d \d\d:\d\d$/);
+  assert.equal(h[1].at, '2026-01-02 10:00');
+});

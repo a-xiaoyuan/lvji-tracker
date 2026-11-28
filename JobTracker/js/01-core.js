@@ -8,7 +8,7 @@ const ST=[
  {k:'rejected',n:'未通过',c:'#dfe2e7'},{k:'dropped',n:'已放弃',c:'#dfe2e7'}];
 const SM=Object.fromEntries(ST.map(s=>[s.k,s]));
 const CH=['Boss直聘','内推','官网','拉勾','猎聘','牛客','智联','前程无忧','校招','猎头','其他'];
-const EV={interview:'面试',test:'笔试/测评',followup:'跟进',offer:'Offer 沟通',note:'备注'};
+const EV={interview:'面试',test:'笔试/测评',followup:'跟进',reply:'HR 回复',offer:'Offer 沟通',note:'备注'};
 const PRI={1:['高','#ff2d87'],2:['中','#787e8a'],3:['低','#c9ced6']};
 const ACTIVE=['applied','test','interview','hr'];
 const KEY='jobtracker_v1',API='http://127.0.0.1:47321/api/jobtracker',RUYE='http://127.0.0.1:47321/';
@@ -50,12 +50,12 @@ const TPL_VARS=['{公司}','{岗位}','{联系人}','{我}','{投递日期}','{�
 
 /* ========== 数据 ========== */
 function newApp(p={}){return Object.assign({id:uid(),company:'',role:'',city:'',salary:'',channel:'Boss直聘',status:'applied',priority:2,appliedAt:today(),due:'',link:'',site:'',resume:'',contact:'',notes:'',events:[],history:[],offer:{base:'',months:'',bonus:'',stock:'',other:'',wlb:3,growth:3,deadline:''},updatedAt:Date.now()},p);}
-function normalize(d){d=d&&typeof d==='object'?d:{};d.apps=Array.isArray(d.apps)?d.apps.filter(a=>a&&typeof a==='object').map(a=>{const n=newApp(a);if(!n.id)n.id=uid();n.offer=Object.assign({wlb:3,growth:3},a.offer&&typeof a.offer==='object'?a.offer:{});n.events=(Array.isArray(a.events)?a.events:[]).filter(e=>e&&typeof e==='object').map(e=>Object.assign({rating:0,questions:'',review:'',place:'',done:false},e,{id:e.id||uid()}));n.history=Array.isArray(a.history)?a.history:[];
+function normalize(d){d=d&&typeof d==='object'?d:{};d.apps=Array.isArray(d.apps)?d.apps.filter(a=>a&&typeof a==='object').map(a=>{const n=newApp(a);if(!n.id)n.id=uid();n.offer=Object.assign({wlb:3,growth:3},a.offer&&typeof a.offer==='object'?a.offer:{});n.events=(Array.isArray(a.events)?a.events:[]).filter(e=>e&&typeof e==='object').map(e=>Object.assign({rating:0,questions:'',review:'',place:'',done:false},e,{id:e.id||uid()}));n.history=(Array.isArray(a.history)?a.history:[]).filter(h=>h&&typeof h==='object').map(h=>typeof h.at==='string'?h:{...h,at:typeof h.at==='number'&&h.at>0?(x=>`${dstr(x)} ${pad(x.getHours())}:${pad(x.getMinutes())}`)(new Date(h.at)):''}).filter(h=>h.at);
  // 坏数据兜底：字段类型不对、状态不认识、日期不合法时修正，避免整页白屏
  for(const f of ['company','role','city','salary','channel','link','site','resume','contact','notes','due'])if(typeof n[f]!=='string')n[f]=n[f]==null?'':String(n[f]);
  if(!ST.some(s=>s.k===n.status))n.status='applied';if(!/^\d{4}-\d{2}-\d{2}$/.test(n.appliedAt||''))n.appliedAt=today();return n;}):[];
  d.settings=Object.assign({weekGoal:10,notify:false,startDate:'',profile:{}},d.settings||{});d.qmark=d.qmark||{};
- d.journal=Array.isArray(d.journal)?d.journal:[];d.habits=Array.isArray(d.habits)?d.habits:DEF_HABITS.map(h=>({...h}));d.skills=Array.isArray(d.skills)?d.skills:[];d.stories=Array.isArray(d.stories)?d.stories:[];d.people=Array.isArray(d.people)?d.people:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.reviews=d.reviews||{};d.milestones=Array.isArray(d.milestones)?d.milestones:[];d.qsrs=d.qsrs||{};d.mocks=Array.isArray(d.mocks)?d.mocks:[];d.subs=Array.isArray(d.subs)?d.subs:[];d.chat=Array.isArray(d.chat)?d.chat:[];d.qnote=d.qnote||{};d.tpls=Array.isArray(d.tpls)?d.tpls:DEF_TPL.map(t=>({...t}));
+ d.journal=Array.isArray(d.journal)?d.journal:[];d.habits=Array.isArray(d.habits)?d.habits:DEF_HABITS.map(h=>({...h}));d.skills=Array.isArray(d.skills)?d.skills:[];d.stories=Array.isArray(d.stories)?d.stories:[];d.people=Array.isArray(d.people)?d.people:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.reviews=d.reviews||{};d.milestones=Array.isArray(d.milestones)?d.milestones:[];d.qsrs=d.qsrs||{};d.mocks=Array.isArray(d.mocks)?d.mocks:[];d.subs=Array.isArray(d.subs)?d.subs:[];d.chat=Array.isArray(d.chat)?d.chat:[];d.mails=Array.isArray(d.mails)?d.mails:[];d.qnote=d.qnote||{};d.tpls=Array.isArray(d.tpls)?d.tpls:DEF_TPL.map(t=>({...t}));
  if(!d.settings.v1SamplesCleaned){const n=d.apps.length;d.apps=d.apps.filter(a=>!(a.sample||/（示例）$/.test(a.company)||/^示例公司 [A-Z]$/.test(a.company)));d.settings.v1SamplesCleaned=true;if(d.apps.length!==n){d.qmark={};d._cleaned=true;}}
  return d;}
 /* 两个履迹窗口同时改了数据时合并（theirs = 文件里别的窗口存的，mine = 本窗口的）：
@@ -103,7 +103,7 @@ function skSweep(root){if(!SKFX||!root.querySelectorAll)return;
  for(const b of root.querySelectorAll('button.btn'))skBtn(b);
  for(const i of root.querySelectorAll('input.chk[type=checkbox]'))skChk(i);
  for(const r of root.querySelectorAll('input[type=range]'))skRange(r);
- for(const p of root.querySelectorAll('.goal .bar,.tbar,.fcbar'))skProg(p);}
+ for(const p of root.querySelectorAll('.fcbar'))skProg(p);}
 // 关键动作的拟声字：x,y 是视口坐标
 function skHit(x,y,word='pon',big){if(!SKFX||SKFX.calm)return;const X=x+scrollX,Y=y+scrollY;
  SKFX.burst(X,Y,{r:big?80:44,spikes:big?17:13,life:.4});SKFX.shards(X,Y,{n:big?10:6,speed:big?240:170,size:big?8:6,arc:6.28,grav:300,life:.8});

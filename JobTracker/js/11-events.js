@@ -105,6 +105,27 @@ if(act==='noticeok')return noticeOk();
   if(act==='copymiss')return copyText(actEl.dataset.k,'已复制，去简历里补上会的那些');
   if(act==='listmore'){LIST_LIM+=300;return render();}
   if(act==='csv'){download(`履迹-投递记录-${today()}.csv`,toCSV(),'text/csv;charset=utf-8');return toast(`已导出 ${db.apps.length} 条，可以直接用 Excel 打开`);}
+  if(act==='sel'){const id=actEl.dataset.a;SEL.has(id)?SEL.delete(id):SEL.add(id);return render();}
+  if(act==='selall'){const L=listFilter(),all=L.length&&L.every(a=>SEL.has(a.id));for(const a of L)all?SEL.delete(a.id):SEL.add(a.id);return render();}
+  if(act==='selnone'){SEL.clear();return render();}
+  if(act==='bulkdel')return bulkDelete();
+  if(act==='dupopen'){closeModal();return openDrawer(actEl.dataset.a);}
+  if(act==='weekhide'){db.settings.weekCardHide=actEl.dataset.k;persist();render();return toast('收起了，下周日会再出现');}
+  if(act==='weekimg')return openWeekImg();
+  if(act==='phoneon')return phoneSet(true,false);
+  if(act==='navreset'){delete db.settings.navPin;persist();render();return toast('左边栏恢复成默认的常用页面');}
+  if(act==='mailgo')return mailGo(actEl.dataset.id);
+  if(act==='mailskip')return mailSkip(actEl.dataset.id);
+  if(act==='mailskipall')return mailSkip('');
+  if(act==='mailon'){const u=document.getElementById('mlUser')?.value.trim()||'',p=document.getElementById('mlPass')?.value||'';if(!u)return toast('先填 QQ 邮箱地址');if(!p&&!MAIL?.hasPass)return toast('先填授权码（在 QQ 邮箱设置里生成）');return mailSet({user:u,pass:p,on:true},'正在连接邮箱，第一次会看最近 7 天的邮件，稍等…');}
+  if(act==='mailoff')return mailSet({on:false});
+  if(act==='mailcheck')return mailSet({check:true},'正在查看邮箱…');
+  if(act==='mailforget'){if(!confirm('忘掉邮箱地址和授权码？之后要用得重新填。'))return;return mailSet({forget:true});}
+  if(act==='phoneoff')return phoneSet(false,false);
+  if(act==='phonereset')return phoneSet(true,true);
+  if(act==='phonecopy')return copyText(actEl.dataset.u,'已复制手机链接，发到手机上打开');
+  if(act==='colmore'){const k=actEl.dataset.k;BLIM[k]=(BLIM[k]||BSTEP)+BSTEP;return render();}
+  if(act==='colall'){F.status=actEl.dataset.k;F.q='';view='list';render();document.querySelector('main').scrollTop=0;return;}
   if(act==='fold'){const k=actEl.dataset.k;FOLD[k]=FOLD[k]?0:1;localStorage.setItem('jt_fold',JSON.stringify(FOLD));return render();}
   if(act==='add')return openAdd(actEl.dataset.st);
   if(act==='bulk')return openAdd('applied','bulk');
@@ -123,7 +144,7 @@ if(act==='noticeok')return noticeOk();
   if(act==='weakreview')return startReview(true);
   if(act==='jdadd'){const n=JD_MISSING.length;JD_MISSING.forEach(name=>db.skills.push({id:uid(),name,cat:'待分类',level:1,target:3,notes:'从岗位 JD 里加入',link:''}));persist();const nj=document.getElementById('nJD');if(nj)document.getElementById('jdBox').innerHTML=jdHtml(nj.value);else if(openId)renderDrawer();return toast(`已把 ${n} 项加入能力树，去给自己打个分吧`);}
   if(act==='poster')return openPoster();
-  if(act==='posterdown'){const cv=document.getElementById('posterCv');if(cv)cv.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='求职季海报.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),4000);});return;}
+  if(act==='posterdown'){const cv=document.getElementById('posterCv');if(cv)cv.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=actEl.dataset.name||'求职季海报.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),4000);});return;}
   if(act==='addms'){const d=document.getElementById('msDate').value,t=document.getElementById('msTitle').value.trim();if(!t){document.getElementById('msTitle').focus();return toast('写一下这个里程碑');}db.milestones.push({id:uid(),date:d||today(),title:t});persist();render();return toast('⭐ 已记进你的历程');}
   if(act==='copyreview'){const Rg=pRange(rvU,rvO),c=pStats(Rg),rv=db.reviews[rvU+':'+Rg[0]]||{},lab=rvLab();
    const txt=[`# 履迹 · ${lab}回顾（${Rg[0]} ~ ${Rg[1]}）`,'',`- 投递 ${c.apps} 个，面试 ${c.iv} 场${c.offers.length?'，拿到 '+c.offers.join('、')+' 的 Offer':''}`,`- 记录 ${c.days} 天，学习 ${c.hours} 小时，专注 ${c.focus} 分钟${c.mood?'，平均心情 '+MOODS[Math.round(c.mood)-1]:''}`,`- 打卡：${db.habits.map(h=>h.name+' '+c.habits[h.id]+' 天').join('，')||'无'}`,'','## 做得好的',rv.good||'（未填写）','','## 需要改进的',rv.bad||'（未填写）','','## 下阶段计划',rv.next||'（未填写）'].join('\n');
@@ -169,7 +190,7 @@ if(act==='noticeok')return noticeOk();
  const a=openId&&appById(openId);
  const st=T.closest('[data-setst]');if(st&&a){setStatus(a,st.dataset.setst);renderDrawer();render();return;}
  const ae=T.closest('[data-addev]');if(ae&&a){const d=new Date(Date.now()+864e5);const tp=ae.dataset.addev,n=a.events.filter(x=>x.type==='interview').length;
-  a.events.push({id:uid(),type:tp,title:tp==='interview'?['一面','二面','三面','四面','五面'][n]||`第${n+1}轮`:'',at:`${dstr(d)}T10:00`,done:false,rating:0,questions:'',review:'',place:''});
+  a.events.push({id:uid(),type:tp,title:tp==='interview'?['一面','二面','三面','四面','五面'][n]||`第${n+1}轮`:tp==='reply'?'HR 回复':'',at:tp==='reply'?nowLocal():`${dstr(d)}T10:00`,done:tp==='reply',rating:0,questions:'',review:'',place:''});
   if(tp==='interview'&&['applied','test','wish'].includes(a.status))setStatus(a,'interview');else if(tp==='test'&&['applied','wish'].includes(a.status))setStatus(a,'test');
   touch(a);renderDrawer();render();return;}
  const de=T.closest('[data-delev]');if(de&&a){const i=a.events.findIndex(x=>x.id===de.dataset.delev),[ev]=a.events.splice(i,1);touch(a);renderDrawer();render();toast('已删除这条记录',['撤销',()=>{a.events.splice(i,0,ev);touch(a);if(openId===a.id)renderDrawer();render();}]);return;}
@@ -193,13 +214,14 @@ document.addEventListener('keydown',e=>{
  if(e.key==='Enter'&&modalOn&&e.target.tagName==='INPUT')return FORM?formSave():saveAdd();
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='n'){e.preventDefault();return openAdd();}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();return openCmdk();}
- if(!modalOn&&!openId&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)&&/^[1-9]$/.test(e.key)){view=VIEWS[+e.key-1][0];render();}
+ if(!modalOn&&!openId&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)&&/^[1-9]$/.test(e.key)){const L=navList(),k=L[+e.key-1];if(k){view=k;render();}}
 });
 document.addEventListener('input',e=>{
  const T=e.target;
  if(T.id==='q'){F.q=T.value;F._focus=true;render();return;}
  if(T.id==='qb'){qSearch=T.value;F._focusB=true;render();return;}
  if(T.id==='bulk'){bulkText=T.value;renderBulkPrev();return;}
+ if(T.id==='nCompany'||T.id==='nRole'){dupRefresh();return;}
  if(T.id==='nJD'){const b=document.getElementById('jdBox');b.innerHTML=T.value.trim()?jdHtml(T.value):'';return;}
  if(T.dataset.qnote){db.qnote[T.dataset.qnote]=T.value;persist();return;}
  if(T.dataset.rv){const k=rvU+':'+pRange(rvU,rvO)[0];(db.reviews[k]=db.reviews[k]||{})[T.dataset.rv]=T.value;persist();return;}
@@ -221,6 +243,8 @@ document.addEventListener('change',async e=>{
  if(T.tagName==='SAKUGA-CHECKBOX'&&(T.dataset.done||T.dataset.prep)){const ev=new MouseEvent('click',{bubbles:true});ev.skChange=true;T.dispatchEvent(ev);return;}
  if(T.dataset.jdate){jDate=T.value&&T.value<=today()?T.value:today();return render();}
  if(T.dataset.flt){F[T.dataset.flt]=T.value;F._focus=false;render();return;}
+ if(T.dataset.navpin){const k=T.dataset.navpin,P=navPins().filter(x=>x!==k);if(T.checked)P.push(k);db.settings.navPin=VIEWS.map(v=>v[0]).filter(x=>P.includes(x));persist();render();return;}
+ if(T.dataset.bulkset!==undefined){if(T.value)bulkStatus(T.value);return;}
  if(T.dataset.set==='notify'){if(T.checked&&typeof Notification!=='undefined'&&Notification.permission!=='granted'){const p=await Notification.requestPermission();if(p!=='granted'){T.checked=false;toast('没有获得通知权限，仍会在应用内提醒');}}db.settings.notify=T.checked;persist();render();return;}
  if(openId&&(T.tagName==='SELECT'||T.type==='checkbox'||T.type==='date'||T.type==='datetime-local'||['link','site','place','notes'].includes(T.dataset.f||T.dataset.ef)))renderDrawer();
 });

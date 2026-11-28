@@ -1,0 +1,11 @@
+{
+  "name": "lvji-helper",
+  "private": true,
+  "description": "履迹本机小助手的依赖：只用于可选的「邮箱收信」功能",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "imapflow": "2.12.2",
+    "mailparser": "3.15.0"
+  }
+}
